@@ -126,10 +126,27 @@ whispertype-build-app --repo-dir "$PWD" --model tiny --language en
 open dist/WhisperType.app
 ```
 
-After that you can also open it from Finder by double-clicking:
+If double-clicking does not show `WT`, rebuild the app after pulling updates:
+
+```bash
+cd open-transcribe-studio
+git pull
+source .venv/bin/activate
+pip install -e .
+whispertype-build-app --repo-dir "$PWD" --model tiny --language en
+open dist/WhisperType.app
+```
+
+The app writes launch errors here:
 
 ```text
-open-transcribe-studio/dist/WhisperType.app
+~/Library/Logs/WhisperType/launcher.log
+```
+
+To inspect it:
+
+```bash
+tail -50 ~/Library/Logs/WhisperType/launcher.log
 ```
 
 What this does:

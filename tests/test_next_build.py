@@ -45,7 +45,7 @@ def test_local_whisper_can_disable_language_for_auto_detect():
     assert model.calls[0][1]["task"] == "transcribe"
 
 
-def test_launcher_script_runs_whispertype_from_repo_venv_without_terminal():
+def test_launcher_script_runs_python_module_from_repo_venv_without_terminal():
     launcher = render_launcher_script(
         repo_dir=Path("/Users/mikka/open-transcribe-studio"),
         model="tiny",
@@ -54,8 +54,9 @@ def test_launcher_script_runs_whispertype_from_repo_venv_without_terminal():
     )
 
     assert "cd '/Users/mikka/open-transcribe-studio'" in launcher
+    assert "LOG_FILE=\"$HOME/Library/Logs/WhisperType/launcher.log\"" in launcher
     assert "source '.venv/bin/activate'" in launcher
-    assert "exec whispertype --model 'tiny' --hold-key 'fn' --language 'en' --menubar" in launcher
+    assert "exec '.venv/bin/python' -m app.mac_dictation.cli --model 'tiny' --hold-key 'fn' --language 'en' --menubar" in launcher
 
 
 def test_build_app_bundle_writes_macos_app_structure(tmp_path):

@@ -26,13 +26,21 @@ def render_launcher_script(
     quoted_language = _single_quote(language)
     return f"""#!/bin/zsh
 set -e
+LOG_DIR="$HOME/Library/Logs/WhisperType"
+LOG_FILE="$HOME/Library/Logs/WhisperType/launcher.log"
+mkdir -p "$LOG_DIR"
+exec >> "$LOG_FILE" 2>&1
+echo "--- WhisperType launch $(date) ---"
 cd {quoted_repo}
-if [ ! -f .venv/bin/activate ]; then
+echo "repo: $(pwd)"
+if [ ! -x .venv/bin/python ]; then
   osascript -e 'display alert "WhisperType setup needed" message "Open Terminal, cd into open-transcribe-studio, then run: python3 -m venv .venv && source .venv/bin/activate && pip install -e ."'
+  echo "missing .venv/bin/python"
   exit 1
 fi
 source '.venv/bin/activate'
-exec whispertype --model {quoted_model} --hold-key {quoted_hold_key} --language {quoted_language} --menubar
+echo "python: $(.venv/bin/python --version)"
+exec '.venv/bin/python' -m app.mac_dictation.cli --model {quoted_model} --hold-key {quoted_hold_key} --language {quoted_language} --menubar
 """
 
 
