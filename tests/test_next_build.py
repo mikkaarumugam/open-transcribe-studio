@@ -79,8 +79,24 @@ def test_native_launcher_execs_repo_python_without_applescript_wrapper():
     assert '".venv/bin/python"' in source
     assert '"app.mac_dictation.cli"' in source
     assert '"--menubar"' in source
+    assert 'printf("--- WhisperType native launch ---\\n");' in source
     assert 'do shell script' not in source
     assert 'osascript' not in source
+
+
+def test_native_launcher_source_has_valid_c_string_escapes():
+    source = render_native_launcher_source(
+        repo_dir=Path("/Users/mikka/open-transcribe-studio"),
+        model="base",
+        hold_key="fn",
+        language="en",
+    )
+
+    assert 'printf("--- WhisperType native launch ---\\n");' in source
+    assert 'fprintf(stderr, "repo path does not exist or cannot be opened: %s: %s\\n", repo, strerror(errno));' in source
+    assert 'printf("repo: %s\\n", repo);' in source
+    assert 'fprintf(stderr, "missing executable .venv/bin/python in %s\\n", repo);' in source
+    assert 'fprintf(stderr, "failed to exec %s: %s\\n", python, strerror(errno));' in source
 
 
 def test_build_app_bundle_writes_macos_app_structure(tmp_path):

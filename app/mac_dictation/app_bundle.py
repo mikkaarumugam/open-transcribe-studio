@@ -114,17 +114,17 @@ int main(int argc, char **argv) {{
     (void)argc;
     (void)argv;
     open_log();
-    printf("--- WhisperType native launch ---\n");
+    printf("--- WhisperType native launch ---\\n");
     const char *repo = "{repo}";
     if (chdir(repo) != 0) {{
-        fprintf(stderr, "repo path does not exist or cannot be opened: %s: %s\n", repo, strerror(errno));
+        fprintf(stderr, "repo path does not exist or cannot be opened: %s: %s\\n", repo, strerror(errno));
         return 1;
     }}
-    printf("repo: %s\n", repo);
+    printf("repo: %s\\n", repo);
 
     const char *python = ".venv/bin/python";
     if (access(python, X_OK) != 0) {{
-        fprintf(stderr, "missing executable .venv/bin/python in %s\n", repo);
+        fprintf(stderr, "missing executable .venv/bin/python in %s\\n", repo);
         return 1;
     }}
 
@@ -151,7 +151,7 @@ int main(int argc, char **argv) {{
         "--menubar",
         (char *)NULL
     );
-    fprintf(stderr, "failed to exec %s: %s\n", python, strerror(errno));
+    fprintf(stderr, "failed to exec %s: %s\\n", python, strerror(errno));
     return 1;
 }}
 '''
