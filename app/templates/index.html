@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Open Transcribe Studio</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">Free local-first AI audio workflow</p>
+      <h1>Turn audio into transcripts, subtitles, summaries, and reusable data.</h1>
+      <p class="subcopy">A Gladia-inspired portfolio project using open-source Whisper locally instead of paid transcription APIs.</p>
+    </section>
+
+    <section class="card">
+      <h2>Upload audio/video</h2>
+      <form id="upload-form">
+        <label>Whisper model
+          <select name="model_size" id="model-size">
+            <option value="tiny">tiny - fastest CPU demo</option>
+            <option value="base">base - better accuracy</option>
+            <option value="small">small - slower, stronger</option>
+            <option value="medium">medium</option>
+            <option value="large-v3">large-v3</option>
+          </select>
+        </label>
+        <input type="file" name="file" id="file" accept="audio/*,video/*" required />
+        <button type="submit">Transcribe upload</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Record from microphone</h2>
+      <div class="row">
+        <button id="record">Start recording</button>
+        <button id="stop" disabled>Stop & transcribe</button>
+      </div>
+      <p id="recording-status">Idle</p>
+    </section>
+
+    <section class="card results" id="results" hidden>
+      <h2>Result</h2>
+      <div id="meta"></div>
+      <h3>Summary</h3>
+      <p id="summary"></p>
+      <h3>Keywords</h3>
+      <div id="keywords"></div>
+      <h3>Transcript</h3>
+      <pre id="transcript"></pre>
+      <h3>Exports</h3>
+      <div id="exports"></div>
+    </section>
+
+    <section class="card" id="status-card" hidden>
+      <h2>Status</h2>
+      <pre id="status"></pre>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
