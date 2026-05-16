@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 from app.mac_dictation.controller import DictationController
 
@@ -16,14 +17,19 @@ class MacFnStateTracker:
 
     controller: DictationController
     is_fn_down: bool = False
+    on_state_change: Callable[[str], None] | None = None
 
     def handle_flags(self, flags: int) -> None:
         fn_down_now = bool(int(flags) & FN_FLAG_MASK)
         if fn_down_now and not self.is_fn_down:
             self.is_fn_down = True
+            if self.on_state_change is not None:
+                self.on_state_change("down")
             self.controller.on_fn_down()
         elif not fn_down_now and self.is_fn_down:
             self.is_fn_down = False
+            if self.on_state_change is not None:
+                self.on_state_change("up")
             self.controller.on_fn_up()
 
 
@@ -36,7 +42,10 @@ class MacFnEventTapListener:
     """
 
     def __init__(self, controller: DictationController):
-        self.tracker = MacFnStateTracker(controller)
+        self.tracker = MacFnStateTracker(
+            controller,
+            on_state_change=lambda state: print(f"[WhisperType] fn {state}", flush=True),
+        )
 
     def _callback(self, proxy, event_type, event, refcon):  # pragma: no cover - macOS integration
         import Quartz
@@ -49,6 +58,7 @@ class MacFnEventTapListener:
     def run_forever(self) -> None:  # pragma: no cover - macOS integration
         import Quartz
 
+        print("[WhisperType] starting native macOS fn event tap", flush=True)
         event_mask = Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
         tap = Quartz.CGEventTapCreate(
             Quartz.kCGSessionEventTap,
@@ -61,7 +71,7 @@ class MacFnEventTapListener:
         if tap is None:
             raise RuntimeError(
                 "Could not create macOS event tap. Grant Accessibility and Input Monitoring "
-                "permissions to your terminal app, then quit and reopen it."
+                "permissions to WhisperType and Python 3, then quit and reopen WhisperType."
             )
         run_loop_source = Quartz.CFMachPortCreateRunLoopSource(None, tap, 0)
         Quartz.CFRunLoopAddSource(
@@ -70,4 +80,5 @@ class MacFnEventTapListener:
             Quartz.kCFRunLoopCommonModes,
         )
         Quartz.CGEventTapEnable(tap, True)
+        print("[WhisperType] native macOS fn event tap is running", flush=True)
         Quartz.CFRunLoopRun()

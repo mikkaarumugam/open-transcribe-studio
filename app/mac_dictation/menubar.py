@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import traceback
 from dataclasses import dataclass
 from typing import Callable
 
@@ -15,6 +16,13 @@ class WhisperTypeMenuBarApp:
 
     run_listener: Callable[[], None]
     status_title: str = "WT"
+
+    def _run_listener_with_logging(self) -> None:
+        try:
+            self.run_listener()
+        except Exception:
+            print("[WhisperType] listener crashed", flush=True)
+            traceback.print_exc()
 
     def run(self) -> None:
         try:
@@ -47,7 +55,11 @@ class WhisperTypeMenuBarApp:
         menu.addItem_(quit_item)
         status_item.setMenu_(menu)
 
-        listener_thread = threading.Thread(target=self.run_listener, name="WhisperTypeListener", daemon=True)
+        listener_thread = threading.Thread(
+            target=self._run_listener_with_logging,
+            name="WhisperTypeListener",
+            daemon=True,
+        )
         listener_thread.start()
         app.run()
         _ = NSApp  # keep imported symbol referenced for pyobjc/linters

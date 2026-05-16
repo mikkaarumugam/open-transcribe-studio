@@ -46,12 +46,14 @@ If it does not prompt automatically, open:
 
 System Settings → Privacy & Security
 
-Then grant permissions to the terminal app you use, for example:
+When running from Terminal, grant permissions to the terminal app you use, for example:
 
 - Terminal
 - iTerm
 - Cursor terminal
 - VS Code terminal
+
+When running `dist/WhisperType.app`, macOS may show separate permission rows for `WhisperType` and `Python 3`. For the current free Python-powered prototype, grant Input Monitoring and Accessibility to both if `fn` is not detected or paste does not work. After changing permissions, quit `WT` from the menu bar and reopen `dist/WhisperType.app`.
 
 ## Install on your Mac
 
@@ -146,8 +148,18 @@ The app writes launch errors here:
 To inspect it:
 
 ```bash
-tail -50 ~/Library/Logs/WhisperType/launcher.log
+tail -80 ~/Library/Logs/WhisperType/launcher.log
 ```
+
+When `fn` detection is healthy, the log should include:
+
+```text
+[WhisperType] native macOS fn event tap is running
+[WhisperType] fn down
+[WhisperType] fn up
+```
+
+If `WT` appears but pressing `fn` does nothing and the log does not show `fn down`, re-check Input Monitoring and Accessibility for both `WhisperType` and `Python 3`, then quit and reopen the app.
 
 What this does:
 
