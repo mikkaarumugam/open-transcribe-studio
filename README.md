@@ -23,8 +23,9 @@ Built:
 - macOS-oriented global hold-to-dictate CLI.
 - Default hold key: `fn`.
 - Local microphone recording while the key is held.
-- Local transcription with `faster-whisper`.
+- Local transcription with `faster-whisper`, forced to English by default to avoid wrong-language hallucinations.
 - Clipboard + Cmd+V paste into the active macOS app.
+- Optional macOS menu bar mode plus a free local `.app` launcher so Terminal does not need to stay open.
 - Lightweight cleanup: removes common fillers like “um/uh”, trims spaces, capitalizes, and adds final punctuation.
 - Tests for the dictation controller and cleanup behavior.
 - Original web transcription studio still exists as a secondary demo/API, but the main product direction is now universal voice typing.
@@ -79,6 +80,18 @@ source .venv/bin/activate
 whispertype --model tiny
 ```
 
+WhisperType now forces English transcription by default:
+
+```bash
+whispertype --model tiny --language en
+```
+
+If you want Whisper to auto-detect language instead:
+
+```bash
+whispertype --model tiny --language auto
+```
+
 Then:
 
 1. Click into any text box in any app.
@@ -101,6 +114,32 @@ whispertype --model tiny --hold-key f18
 ```
 
 Or try another key name that your keyboard listener can see.
+
+## Run as a menu bar app without Terminal
+
+Once the normal `whispertype --model tiny` command works in Terminal, build the local app launcher:
+
+```bash
+cd open-transcribe-studio
+source .venv/bin/activate
+whispertype-build-app --repo-dir "$PWD" --model tiny --language en
+open dist/WhisperType.app
+```
+
+After that you can also open it from Finder by double-clicking:
+
+```text
+open-transcribe-studio/dist/WhisperType.app
+```
+
+What this does:
+
+- launches WhisperType as a normal macOS menu bar app;
+- shows a small `WT` item in the menu bar;
+- keeps listening for hold-`fn` dictation while Terminal is closed;
+- lets you quit from the menu bar.
+
+CPU note: idle usage should be very low because it is only listening for key events. CPU spikes happen after you release `fn`, while Whisper transcribes the recorded audio locally.
 
 ## Run tests
 
@@ -137,7 +176,6 @@ Next steps:
   - polished message;
   - email style;
   - coding prompt style.
-- Package as a macOS menubar app.
 - Add demo GIF and portfolio case study.
 
 ## Portfolio angle

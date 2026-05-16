@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import platform
+from collections.abc import Callable
 
 from app.mac_dictation.controller import DictationController
 from app.mac_dictation.hotkey import HoldKeyListener
@@ -10,34 +11,54 @@ from app.mac_dictation.recorder import WavHoldRecorder
 from app.mac_dictation.whisper import LocalWhisperTranscriber
 
 
+def create_controller(model: str = "tiny", language: str = "en") -> DictationController:
+    return DictationController(
+        recorder=WavHoldRecorder(),
+        transcriber=LocalWhisperTranscriber(model_size=model, language=language),
+        typer=MacClipboardTyper(),
+    )
+
+
+def create_listener_runner(controller: DictationController, hold_key: str) -> Callable[[], None]:
+    is_macos = platform.system() == "Darwin"
+    if is_macos and hold_key.lower() == "fn":
+        from app.mac_dictation.macos_fn import MacFnEventTapListener
+
+        return MacFnEventTapListener(controller=controller).run_forever
+    return HoldKeyListener(controller=controller, hold_key=hold_key).run_forever
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="WhisperType: hold fn to dictate into any macOS app")
     parser.add_argument("--model", default="tiny", help="faster-whisper model size: tiny/base/small/medium/large-v3")
     parser.add_argument("--hold-key", default="fn", help="Key to hold for recording. Default: fn. Fallback examples: f18, option_r")
+    parser.add_argument("--language", default="en", help="Transcription language code. Default: en. Use auto to enable Whisper auto-detection.")
+    parser.add_argument("--menubar", action="store_true", help="Run as a macOS menu bar app instead of a terminal foreground process")
     args = parser.parse_args()
 
     is_macos = platform.system() == "Darwin"
     if not is_macos:
         print("Warning: global paste is designed for macOS. Tests can run elsewhere, but the app should be used on your Mac.")
 
-    controller = DictationController(
-        recorder=WavHoldRecorder(),
-        transcriber=LocalWhisperTranscriber(model_size=args.model),
-        typer=MacClipboardTyper(),
-    )
+    controller = create_controller(model=args.model, language=args.language)
+    run_listener = create_listener_runner(controller=controller, hold_key=args.hold_key)
+
+    if args.menubar:
+        from app.mac_dictation.menubar import WhisperTypeMenuBarApp
+
+        WhisperTypeMenuBarApp(run_listener=run_listener).run()
+        return
+
     print("WhisperType is running.")
     print(f"Hold {args.hold_key} to record. Release {args.hold_key} to transcribe and paste.")
+    print(f"Transcription language: {args.language}.")
 
     if is_macos and args.hold_key.lower() == "fn":
         print("Using native macOS fn/Globe detection via Quartz flags.")
         print("If this fails, re-check Accessibility + Input Monitoring permissions, then quit/reopen Terminal.")
-        from app.mac_dictation.macos_fn import MacFnEventTapListener
-
-        MacFnEventTapListener(controller=controller).run_forever()
-        return
-
-    print("Using generic key listener. If fn is not detected on your Mac, try: --hold-key f18")
-    HoldKeyListener(controller=controller, hold_key=args.hold_key).run_forever()
+    else:
+        print("Using generic key listener. If fn is not detected on your Mac, try: --hold-key f18")
+    run_listener()
 
 
 if __name__ == "__main__":

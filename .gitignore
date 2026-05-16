@@ -18,3 +18,5 @@ __pycache__/
 *.mov
 *.webm
 .DS_Store
+/dist/
+uv.lock
