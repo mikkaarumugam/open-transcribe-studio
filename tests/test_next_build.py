@@ -78,8 +78,10 @@ def test_native_launcher_execs_repo_python_without_applescript_wrapper():
     assert 'execl(' in source
     assert '".venv/bin/python"' in source
     assert '"app.mac_dictation.cli"' in source
-    assert '"--menubar"' in source
+    assert '"--menubar"' not in source
     assert 'printf("--- WhisperType native launch ---\\n");' in source
+    assert "NSStatusItem *statusItem" in source
+    assert 'setTitle:@"WT"' in source
     assert 'do shell script' not in source
     assert 'osascript' not in source
 

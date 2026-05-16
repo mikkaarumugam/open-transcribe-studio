@@ -76,13 +76,31 @@ def render_native_launcher_source(
     model_c = _c_string(model)
     hold_key_c = _c_string(hold_key)
     language_c = _c_string(language)
-    return f'''#include <errno.h>
-#include <libgen.h>
+    return f'''#import <Cocoa/Cocoa.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
+
+static pid_t child_pid = -1;
+static NSStatusItem *statusItem = nil;
+
+@interface WhisperTypeAppDelegate : NSObject <NSApplicationDelegate>
+@end
+
+@implementation WhisperTypeAppDelegate
+- (void)quitWhisperType:(id)sender {{
+    (void)sender;
+    if (child_pid > 0) {{
+        kill(child_pid, SIGTERM);
+    }}
+    [NSApp terminate:nil];
+}}
+@end
 
 static void ensure_log_dir(void) {{
     const char *home = getenv("HOME");
@@ -110,6 +128,48 @@ static void open_log(void) {{
     setvbuf(stderr, NULL, _IONBF, 0);
 }}
 
+static int start_python_worker(const char *repo) {{
+    const char *python = ".venv/bin/python";
+    if (access(python, X_OK) != 0) {{
+        fprintf(stderr, "missing executable .venv/bin/python in %s\\n", repo);
+        return 1;
+    }}
+
+    child_pid = fork();
+    if (child_pid < 0) {{
+        fprintf(stderr, "failed to fork Python worker: %s\\n", strerror(errno));
+        return 1;
+    }}
+    if (child_pid == 0) {{
+        char virtual_env[4096];
+        char path_env[8192];
+        const char *old_path = getenv("PATH");
+        snprintf(virtual_env, sizeof(virtual_env), "%s/.venv", repo);
+        setenv("VIRTUAL_ENV", virtual_env, 1);
+        snprintf(path_env, sizeof(path_env), "%s/.venv/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:%s", repo, old_path ? old_path : "");
+        setenv("PATH", path_env, 1);
+        setenv("PYTHONUNBUFFERED", "1", 1);
+
+        execl(
+            python,
+            python,
+            "-m",
+            "app.mac_dictation.cli",
+            "--model",
+            "{model_c}",
+            "--hold-key",
+            "{hold_key_c}",
+            "--language",
+            "{language_c}",
+            (char *)NULL
+        );
+        fprintf(stderr, "failed to exec %s: %s\\n", python, strerror(errno));
+        _exit(1);
+    }}
+    printf("[WhisperType] Python worker started: %d\\n", child_pid);
+    return 0;
+}}
+
 int main(int argc, char **argv) {{
     (void)argc;
     (void)argv;
@@ -122,37 +182,31 @@ int main(int argc, char **argv) {{
     }}
     printf("repo: %s\\n", repo);
 
-    const char *python = ".venv/bin/python";
-    if (access(python, X_OK) != 0) {{
-        fprintf(stderr, "missing executable .venv/bin/python in %s\\n", repo);
-        return 1;
+    @autoreleasepool {{
+        NSApplication *app = [NSApplication sharedApplication];
+        WhisperTypeAppDelegate *delegate = [[WhisperTypeAppDelegate alloc] init];
+        [app setDelegate:delegate];
+        [app setActivationPolicy:NSApplicationActivationPolicyAccessory];
+
+        statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+        [statusItem.button setTitle:@"WT"];
+        [statusItem.button setToolTip:@"WhisperType is running — hold fn to dictate"];
+
+        NSMenu *menu = [[NSMenu alloc] init];
+        [menu addItemWithTitle:@"WhisperType running — hold fn to dictate" action:nil keyEquivalent:@""];
+        [menu addItem:[NSMenuItem separatorItem]];
+        NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit WhisperType" action:@selector(quitWhisperType:) keyEquivalent:@"q"];
+        [quitItem setTarget:delegate];
+        [menu addItem:quitItem];
+        [statusItem setMenu:menu];
+        printf("[WhisperType] native menu bar item ready: WT\\n");
+
+        if (start_python_worker(repo) != 0) {{
+            return 1;
+        }}
+        [app run];
     }}
-
-    char virtual_env[4096];
-    char path_env[8192];
-    const char *old_path = getenv("PATH");
-    snprintf(virtual_env, sizeof(virtual_env), "%s/.venv", repo);
-    setenv("VIRTUAL_ENV", virtual_env, 1);
-    snprintf(path_env, sizeof(path_env), "%s/.venv/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:%s", repo, old_path ? old_path : "");
-    setenv("PATH", path_env, 1);
-    setenv("PYTHONUNBUFFERED", "1", 1);
-
-    execl(
-        python,
-        python,
-        "-m",
-        "app.mac_dictation.cli",
-        "--model",
-        "{model_c}",
-        "--hold-key",
-        "{hold_key_c}",
-        "--language",
-        "{language_c}",
-        "--menubar",
-        (char *)NULL
-    );
-    fprintf(stderr, "failed to exec %s: %s\\n", python, strerror(errno));
-    return 1;
+    return 0;
 }}
 '''
 
@@ -207,7 +261,7 @@ def _write_native_launcher_app(
         hold_key=hold_key,
         language=language,
     )
-    source_path = resources_dir / "WhisperTypeLauncher.c"
+    source_path = resources_dir / "WhisperTypeLauncher.m"
     source_path.write_text(source)
     executable = macos_dir / "WhisperType"
     clang = shutil.which("clang") or shutil.which("cc")
@@ -215,7 +269,7 @@ def _write_native_launcher_app(
         raise RuntimeError(
             "Building the portfolio-grade macOS app requires clang. Install Apple Command Line Tools with: xcode-select --install"
         )
-    subprocess.run([clang, str(source_path), "-o", str(executable)], check=True)
+    subprocess.run([clang, str(source_path), "-framework", "Cocoa", "-o", str(executable)], check=True)
     executable.chmod(executable.stat().st_mode | 0o755)
     _ad_hoc_codesign(app_path)
     return app_path
