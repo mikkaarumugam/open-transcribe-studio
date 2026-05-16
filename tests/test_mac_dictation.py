@@ -42,7 +42,7 @@ def test_controller_records_while_fn_is_held_then_pastes_clean_text():
     recorder = FakeRecorder()
     transcriber = FakeTranscriber()
     typer = FakeTyper()
-    controller = DictationController(recorder=recorder, transcriber=transcriber, typer=typer)
+    controller = DictationController(recorder=recorder, transcriber=transcriber, typer=typer, min_record_seconds=0)
 
     controller.on_fn_down()
     controller.on_fn_up()
@@ -57,7 +57,7 @@ def test_controller_ignores_repeated_fn_down_until_key_is_released():
     recorder = FakeRecorder()
     transcriber = FakeTranscriber()
     typer = FakeTyper()
-    controller = DictationController(recorder=recorder, transcriber=transcriber, typer=typer)
+    controller = DictationController(recorder=recorder, transcriber=transcriber, typer=typer, min_record_seconds=0)
 
     controller.on_fn_down()
     controller.on_fn_down()
