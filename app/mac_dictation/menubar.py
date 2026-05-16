@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 
@@ -16,6 +16,8 @@ class WhisperTypeMenuBarApp:
 
     run_listener: Callable[[], None]
     status_title: str = "WT"
+    _status_item: object | None = field(default=None, init=False, repr=False)
+    _menu: object | None = field(default=None, init=False, repr=False)
 
     def _run_listener_with_logging(self) -> None:
         try:
@@ -53,7 +55,10 @@ class WhisperTypeMenuBarApp:
         menu.addItem_(NSMenuItem.separatorItem())
         quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Quit WhisperType", "terminate:", "q")
         menu.addItem_(quit_item)
+        self._status_item = status_item
+        self._menu = menu
         status_item.setMenu_(menu)
+        print("[WhisperType] menu bar item ready: WT", flush=True)
 
         listener_thread = threading.Thread(
             target=self._run_listener_with_logging,
