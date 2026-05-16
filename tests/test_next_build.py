@@ -57,7 +57,8 @@ def test_launcher_script_runs_python_module_from_repo_venv_without_terminal():
         language="en",
     )
 
-    assert "cd '/Users/mikka/open-transcribe-studio'" in launcher
+    assert "REPO_DIR='/Users/mikka/open-transcribe-studio'" in launcher
+    assert "repo path does not exist: $REPO_DIR" in launcher
     assert "LOG_FILE=\"$HOME/Library/Logs/WhisperType/launcher.log\"" in launcher
     assert "source '.venv/bin/activate'" in launcher
     assert "exec '.venv/bin/python' -m app.mac_dictation.cli --model 'tiny' --hold-key 'fn' --language 'en' --menubar" in launcher

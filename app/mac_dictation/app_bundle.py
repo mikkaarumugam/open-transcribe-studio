@@ -35,11 +35,17 @@ LOG_FILE="$HOME/Library/Logs/WhisperType/launcher.log"
 mkdir -p "$LOG_DIR"
 exec >> "$LOG_FILE" 2>&1
 echo "--- WhisperType launch $(date) ---"
-cd {quoted_repo}
+REPO_DIR={quoted_repo}
+if [ ! -d "$REPO_DIR" ]; then
+  osascript -e "display alert \"WhisperType repo not found\" message \"The app was built for: $REPO_DIR. Rebuild it from the real open-transcribe-studio folder with: whispertype-build-app --repo-dir \\\"$PWD\\\" --model tiny --language en\""
+  echo "repo path does not exist: $REPO_DIR"
+  exit 1
+fi
+cd "$REPO_DIR"
 echo "repo: $(pwd)"
 if [ ! -x .venv/bin/python ]; then
-  osascript -e 'display alert "WhisperType setup needed" message "Open Terminal, cd into open-transcribe-studio, then run: python3 -m venv .venv && source .venv/bin/activate && pip install -e ."'
-  echo "missing .venv/bin/python"
+  osascript -e 'display alert "WhisperType setup needed" message "Open Terminal, cd into the real open-transcribe-studio folder, then run: python3 -m venv .venv && source .venv/bin/activate && pip install -e ."'
+  echo "missing .venv/bin/python in $(pwd)"
   exit 1
 fi
 source '.venv/bin/activate'
