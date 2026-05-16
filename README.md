@@ -126,7 +126,7 @@ whispertype-build-app --repo-dir "$PWD" --model tiny --language en
 open dist/WhisperType.app
 ```
 
-If double-clicking does not show `WT`, rebuild the app after pulling updates:
+If double-clicking does not show `WT`, rebuild the app after pulling updates. The builder uses macOS `osacompile` on your Mac to create a proper double-clickable AppleScript app wrapper, instead of relying on Finder/LaunchServices to run a raw shell script directly.
 
 ```bash
 cd open-transcribe-studio

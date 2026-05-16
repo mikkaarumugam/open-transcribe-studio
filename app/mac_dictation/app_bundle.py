@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import platform
 import plistlib
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -43,16 +47,27 @@ echo "python: $(.venv/bin/python --version)"
 exec '.venv/bin/python' -m app.mac_dictation.cli --model {quoted_model} --hold-key {quoted_hold_key} --language {quoted_language} --menubar
 """
 
+def render_applescript_launcher(shell_script: str) -> str:
+    """Return AppleScript source for a double-clickable launcher app.
 
-def build_app_bundle(
-    output_dir: Path,
+    LaunchServices is more reliable with an osacompile-built applet than with a
+    raw shell script as CFBundleExecutable. The AppleScript delegates immediately
+    to zsh so the rest of the launcher stays testable and shared.
+    """
+    escaped_script = shell_script.replace("\\", "\\\\").replace('"', '\\"')
+    return f'''on run
+	do shell script "/bin/zsh -lc " & quoted form of "{escaped_script}"
+end run
+'''
+
+
+def _write_fallback_shell_app(
+    app_path: Path,
     repo_dir: Path,
-    model: str = "tiny",
-    hold_key: str = "fn",
-    language: str = "en",
+    model: str,
+    hold_key: str,
+    language: str,
 ) -> Path:
-    """Create a minimal macOS app bundle that starts WhisperType without Terminal."""
-    app_path = output_dir / "WhisperType.app"
     contents = app_path / "Contents"
     macos_dir = contents / "MacOS"
     resources_dir = contents / "Resources"
@@ -63,8 +78,8 @@ def build_app_bundle(
         "CFBundleName": "WhisperType",
         "CFBundleDisplayName": "WhisperType",
         "CFBundleIdentifier": "com.mikka.whispertype",
-        "CFBundleVersion": "0.2.0",
-        "CFBundleShortVersionString": "0.2.0",
+        "CFBundleVersion": "0.2.1",
+        "CFBundleShortVersionString": "0.2.1",
         "CFBundleExecutable": "WhisperType",
         "CFBundlePackageType": "APPL",
         "LSUIElement": True,
@@ -79,6 +94,75 @@ def build_app_bundle(
     )
     launcher.chmod(launcher.stat().st_mode | 0o755)
     return app_path
+
+
+def _write_applescript_app(
+    app_path: Path,
+    repo_dir: Path,
+    model: str,
+    hold_key: str,
+    language: str,
+) -> Path:
+    shell_script = render_launcher_script(
+        repo_dir=repo_dir,
+        model=model,
+        hold_key=hold_key,
+        language=language,
+    )
+    applescript = render_applescript_launcher(shell_script)
+    with tempfile.TemporaryDirectory() as tmp:
+        script_path = Path(tmp) / "WhisperType.applescript"
+        script_path.write_text(applescript)
+        subprocess.run(["osacompile", "-o", str(app_path), str(script_path)], check=True)
+
+    info_plist = app_path / "Contents" / "Info.plist"
+    with info_plist.open("rb") as handle:
+        info = plistlib.load(handle)
+    info.update(
+        {
+            "CFBundleName": "WhisperType",
+            "CFBundleDisplayName": "WhisperType",
+            "CFBundleIdentifier": "com.mikka.whispertype",
+            "CFBundleVersion": "0.2.1",
+            "CFBundleShortVersionString": "0.2.1",
+            "LSUIElement": True,
+            "NSMicrophoneUsageDescription": "WhisperType records while you hold fn so it can transcribe speech locally.",
+        }
+    )
+    with info_plist.open("wb") as handle:
+        plistlib.dump(info, handle)
+    return app_path
+
+
+def build_app_bundle(
+    output_dir: Path,
+    repo_dir: Path,
+    model: str = "tiny",
+    hold_key: str = "fn",
+    language: str = "en",
+) -> Path:
+    """Create a macOS app bundle that starts WhisperType without Terminal."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    app_path = output_dir / "WhisperType.app"
+    if app_path.exists():
+        shutil.rmtree(app_path)
+
+    if platform.system() == "Darwin" and shutil.which("osacompile"):
+        return _write_applescript_app(
+            app_path=app_path,
+            repo_dir=repo_dir,
+            model=model,
+            hold_key=hold_key,
+            language=language,
+        )
+
+    return _write_fallback_shell_app(
+        app_path=app_path,
+        repo_dir=repo_dir,
+        model=model,
+        hold_key=hold_key,
+        language=language,
+    )
 
 
 def main() -> None:

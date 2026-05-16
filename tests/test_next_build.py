@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from app.mac_dictation.app_bundle import build_app_bundle, render_launcher_script
+from app.mac_dictation.app_bundle import (
+    build_app_bundle,
+    render_applescript_launcher,
+    render_launcher_script,
+)
 from app.mac_dictation.whisper import LocalWhisperTranscriber
 
 
@@ -58,6 +62,19 @@ def test_launcher_script_runs_python_module_from_repo_venv_without_terminal():
     assert "source '.venv/bin/activate'" in launcher
     assert "exec '.venv/bin/python' -m app.mac_dictation.cli --model 'tiny' --hold-key 'fn' --language 'en' --menubar" in launcher
 
+
+def test_applescript_launcher_runs_zsh_launcher_for_double_click_apps():
+    launcher = render_launcher_script(
+        repo_dir=Path("/Users/mikka/open-transcribe-studio"),
+        model="tiny",
+        hold_key="fn",
+        language="en",
+    )
+    applescript = render_applescript_launcher(launcher)
+
+    assert 'do shell script "/bin/zsh -lc " & quoted form of' in applescript
+    assert "WhisperType launch" in applescript
+    assert ".venv/bin/python" in applescript
 
 def test_build_app_bundle_writes_macos_app_structure(tmp_path):
     app_path = build_app_bundle(
