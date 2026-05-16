@@ -5,6 +5,7 @@ class FakeRecorder:
     def __init__(self):
         self.starts = 0
         self.stops = 0
+        self.peak_sample = 100
 
     def start(self):
         self.starts += 1

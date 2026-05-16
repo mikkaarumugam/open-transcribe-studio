@@ -7,6 +7,7 @@ class FakeRecorder:
         self.started = False
         self.stopped = False
         self.output_path = None
+        self.peak_sample = 100
 
     def start(self):
         self.started = True
@@ -65,3 +66,44 @@ def test_controller_ignores_repeated_fn_down_until_key_is_released():
 
     assert recorder.started is True
     assert typer.text == "Hello world."
+
+
+def test_controller_emits_status_changes_for_menu_bar_indicator():
+    recorder = FakeRecorder()
+    transcriber = FakeTranscriber()
+    typer = FakeTyper()
+    statuses = []
+    controller = DictationController(
+        recorder=recorder,
+        transcriber=transcriber,
+        typer=typer,
+        min_record_seconds=0,
+        on_status_change=statuses.append,
+    )
+
+    controller.on_fn_down()
+    controller.on_fn_up()
+
+    assert statuses == ["recording", "transcribing", "idle"]
+
+
+def test_controller_does_not_transcribe_or_paste_silent_recording():
+    recorder = FakeRecorder()
+    recorder.peak_sample = 0
+    transcriber = FakeTranscriber()
+    typer = FakeTyper()
+    statuses = []
+    controller = DictationController(
+        recorder=recorder,
+        transcriber=transcriber,
+        typer=typer,
+        min_record_seconds=0,
+        on_status_change=statuses.append,
+    )
+
+    controller.on_fn_down()
+    controller.on_fn_up()
+
+    assert transcriber.path is None
+    assert typer.text is None
+    assert statuses == ["recording", "silence", "idle"]

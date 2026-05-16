@@ -63,7 +63,7 @@ def main() -> None:
             threading.Thread(target=warm_up, name="WhisperTypeModelWarmup", daemon=True).start()
         from app.mac_dictation.menubar import WhisperTypeMenuBarApp
 
-        WhisperTypeMenuBarApp(run_listener=run_listener).run()
+        WhisperTypeMenuBarApp(run_listener=run_listener, controller=controller).run()
         return
 
     print("WhisperType is running.")

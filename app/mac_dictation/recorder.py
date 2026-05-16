@@ -16,6 +16,10 @@ class WavHoldRecorder:
         self._frames: list[bytes] = []
         self._peak_sample = 0
 
+    @property
+    def peak_sample(self) -> int:
+        return self._peak_sample
+
     def start(self) -> None:
         try:
             import sounddevice as sd
