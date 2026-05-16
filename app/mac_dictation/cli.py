@@ -58,9 +58,20 @@ def main() -> None:
     run_listener = create_listener_runner(controller=controller, hold_key=args.hold_key)
 
     if args.menubar:
-        from app.mac_dictation.macos_permissions import request_microphone_permission
+        from app.mac_dictation.macos_permissions import (
+            request_microphone_permission,
+            show_microphone_denied_alert,
+        )
 
-        request_microphone_permission()
+        microphone_allowed = request_microphone_permission()
+        if microphone_allowed is False:
+            print(
+                "[WhisperType] microphone permission denied for menu-bar app runtime; "
+                "not starting broken silent dictation",
+                flush=True,
+            )
+            show_microphone_denied_alert()
+            return
         warm_up = getattr(controller.transcriber, "warm_up", None)
         if callable(warm_up):
             threading.Thread(target=warm_up, name="WhisperTypeModelWarmup", daemon=True).start()

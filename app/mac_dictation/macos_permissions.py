@@ -3,6 +3,22 @@ from __future__ import annotations
 import threading
 
 
+def show_microphone_denied_alert() -> None:
+    try:
+        import subprocess
+
+        subprocess.run(
+            [
+                "osascript",
+                "-e",
+                'display alert "WhisperType microphone blocked" message "macOS denied microphone access for the app runtime. For now, run WhisperType from Terminal where the mic is authorized, or reset Microphone privacy and relaunch WhisperType." as critical',
+            ],
+            check=False,
+        )
+    except Exception:
+        pass
+
+
 def request_microphone_permission(timeout_seconds: float = 10.0) -> bool | None:
     """Ask macOS for microphone access for the current process if possible.
 
