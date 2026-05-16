@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from dataclasses import dataclass
 from typing import Callable
 
@@ -52,7 +53,11 @@ class MacFnEventTapListener:
 
         if event_type == Quartz.kCGEventFlagsChanged:
             flags = Quartz.CGEventGetFlags(event)
-            self.tracker.handle_flags(flags)
+            try:
+                self.tracker.handle_flags(flags)
+            except Exception:
+                print("[WhisperType] fn event handler crashed", flush=True)
+                traceback.print_exc()
         return event
 
     def run_forever(self) -> None:  # pragma: no cover - macOS integration
