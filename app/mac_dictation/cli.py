@@ -58,12 +58,15 @@ def main() -> None:
     run_listener = create_listener_runner(controller=controller, hold_key=args.hold_key)
 
     if args.menubar:
+        from app.mac_dictation.macos_permissions import request_microphone_permission
+
+        request_microphone_permission()
         warm_up = getattr(controller.transcriber, "warm_up", None)
         if callable(warm_up):
             threading.Thread(target=warm_up, name="WhisperTypeModelWarmup", daemon=True).start()
         from app.mac_dictation.menubar import WhisperTypeMenuBarApp
 
-        WhisperTypeMenuBarApp(run_listener=run_listener, controller=controller).run()
+        WhisperTypeMenuBarApp(run_listener=run_listener).run()
         return
 
     print("WhisperType is running.")

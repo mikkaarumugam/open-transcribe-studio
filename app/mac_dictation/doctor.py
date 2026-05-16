@@ -7,6 +7,10 @@ from array import array
 
 
 def measure_microphone_peak(seconds: float = 5.0, sample_rate: int = 16_000) -> int:
+    from app.mac_dictation.macos_permissions import request_microphone_permission
+
+    request_microphone_permission()
+
     import sounddevice as sd
 
     peak = 0
