@@ -21,7 +21,7 @@ for directory in (UPLOAD_DIR, EXPORT_DIR):
 
 app = FastAPI(
     title="Open Transcribe Studio",
-    description="Free local-first Gladia-inspired transcription studio.",
+    description="Free local-first Glaido-inspired transcription studio.",
     version="0.1.0",
 )
 app.mount("/static", StaticFiles(directory=BASE_DIR / "app" / "static"), name="static")

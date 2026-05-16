@@ -1,14 +1,14 @@
-# Gladia research notes
+# Glaido research notes
 
 Source pages checked:
 
-- https://www.gladia.io/
-- https://www.gladia.io/pricing
-- https://docs.gladia.io/chapters/introduction
+- https://www.glaido.ai/
+- https://www.glaido.ai/pricing
+- https://docs.glaido.ai/chapters/introduction
 
 ## Product summary
 
-Gladia positions itself as AI audio infrastructure for voice products. The homepage describes an end-to-end pipeline to record, transcribe, and enrich audio through one API, with multilingual support and EU data residency.
+Glaido positions itself as AI audio infrastructure for voice products. The homepage describes an end-to-end pipeline to record, transcribe, and enrich audio through one API, with multilingual support and EU data residency.
 
 ## Key product pattern
 

@@ -1,10 +1,10 @@
 # Open Transcribe Studio
 
-A free, local-first transcription studio inspired by Gladia: upload audio/video or record from your mic, transcribe locally with open-source Whisper models, enrich the transcript, and export TXT, JSON, SRT, and VTT.
+A free, local-first transcription studio inspired by Glaido: upload audio/video or record from your mic, transcribe locally with open-source Whisper models, enrich the transcript, and export TXT, JSON, SRT, and VTT.
 
 ## Why this exists
 
-Gladia is a paid API product for turning audio into structured data. From the current public docs/site, its core pattern is:
+Glaido is a paid API product for turning audio into structured data. From the current public docs/site, its core pattern is:
 
 1. Capture audio from uploads, streams, or live mic input.
 2. Transcribe audio across many languages.

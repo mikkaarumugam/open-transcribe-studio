@@ -1,7 +1,7 @@
 [project]
 name = "open-transcribe-studio"
 version = "0.1.0"
-description = "Free local-first Gladia-inspired transcription studio for uploads, microphone recordings, exports, and transcript intelligence."
+description = "Free local-first Glaido-inspired transcription studio for uploads, microphone recordings, exports, and transcript intelligence."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 dependencies = [
