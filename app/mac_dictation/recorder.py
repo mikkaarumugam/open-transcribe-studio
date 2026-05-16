@@ -9,12 +9,20 @@ from pathlib import Path
 class WavHoldRecorder:
     """Record microphone audio to a temporary WAV file until stopped."""
 
-    def __init__(self, sample_rate: int = 16_000, channels: int = 1):
+    def __init__(self, sample_rate: int | None = None, channels: int = 1):
         self.sample_rate = sample_rate
         self.channels = channels
         self._stream = None
         self._frames: list[bytes] = []
         self._peak_sample = 0
+
+    def _resolve_sample_rate(self, sounddevice) -> int:
+        if self.sample_rate is not None:
+            return self.sample_rate
+        device_info = sounddevice.query_devices(kind="input")
+        default_sample_rate = int(device_info.get("default_samplerate") or 48_000)
+        self.sample_rate = default_sample_rate
+        return default_sample_rate
 
     @property
     def peak_sample(self) -> int:
@@ -39,8 +47,9 @@ class WavHoldRecorder:
             if samples:
                 self._peak_sample = max(self._peak_sample, max(abs(sample) for sample in samples))
 
+        sample_rate = self._resolve_sample_rate(sd)
         self._stream = sd.RawInputStream(
-            samplerate=self.sample_rate,
+            samplerate=sample_rate,
             channels=self.channels,
             dtype="int16",
             callback=callback,
