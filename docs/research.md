@@ -1,32 +1,49 @@
 # Glaido research notes
 
-Source pages checked:
+Source checked:
 
-- https://www.glaido.ai/
-- https://www.glaido.ai/pricing
-- https://docs.glaido.ai/chapters/introduction
+- https://glaido.com/
 
-## Product summary
+## Corrected product understanding
 
-Glaido positions itself as AI audio infrastructure for voice products. The homepage describes an end-to-end pipeline to record, transcribe, and enrich audio through one API, with multilingual support and EU data residency.
+Glaido is a universal dictation product, not mainly an upload transcription dashboard.
 
-## Key product pattern
+Core promise from the site:
 
-- Capture: uploads, live streams, real-time mic input, common audio formats, SDK/API access.
-- Transcribe: accurate conversational speech-to-text, noisy/multilingual/jargon-heavy audio, speaker detection, 100+ languages.
-- Enrich: audio-to-LLM, PII redaction, sentiment, entity detection, summarization/chapterization/subtitles in docs.
-- Integrate: push enriched data to CRMs/databases/warehouses, webhooks, Zapier/native integrations.
+- “Stop typing start talking.”
+- “Speak naturally. Get clean, ready-to-send text in any app.”
+- “Press one key. Start talking. Your words appear as clean, professional text instantly.”
+- Works in apps like Gmail, GitHub, Notion, Telegram, WhatsApp, Slack, Linear, Cursor, Claude, Figma, Discord, Chrome.
 
-## Pricing observation
+## Feature we care about
 
-The public pricing page showed async transcription at about $0.61/hr, real-time at about $0.75/hr, and 10 free hours monthly. This project avoids per-hour usage fees by using local open-source models.
+The only feature in scope for this portfolio MVP:
+
+Hold a key anywhere on macOS, speak, release the key, and have the cleaned transcript typed/pasted into the currently active app.
+
+User requested the hold key should be `fn`:
+
+- hold `fn` = record;
+- release `fn` = stop, transcribe, paste.
 
 ## MVP interpretation
 
-For a solo-user free tool, the highest value pieces are:
+A free version can be built locally:
 
-1. Local upload/mic capture.
-2. Reliable transcription with timestamps.
-3. Practical exports.
-4. Basic transcript intelligence without paid APIs.
-5. A clean web UI and API that demonstrates product thinking.
+1. Global key listener detects `fn` down/up.
+2. Microphone records while key is held.
+3. Local Whisper transcribes the temporary audio file.
+4. Lightweight cleanup improves raw transcript.
+5. App copies text to clipboard and sends Cmd+V into the active app.
+
+## macOS permission requirements
+
+This workflow needs:
+
+- Microphone permission.
+- Accessibility permission for paste automation.
+- Input Monitoring permission for global key capture.
+
+## Known risk
+
+macOS may not expose the physical `fn` / Globe key to all Python keyboard listener libraries. WhisperType defaults to `fn`, but keeps `--hold-key` configurable so we can test fallback mappings like `f18` on the actual Mac.
