@@ -1,9 +1,11 @@
 from pathlib import Path
+import plistlib
 
 from app.mac_dictation.app_bundle import (
+    BUNDLE_IDENTIFIER,
     build_app_bundle,
-    render_applescript_launcher,
     render_launcher_script,
+    render_native_launcher_source,
 )
 from app.mac_dictation.whisper import LocalWhisperTranscriber
 
@@ -64,18 +66,22 @@ def test_launcher_script_runs_python_module_from_repo_venv_without_terminal():
     assert "exec '.venv/bin/python' -m app.mac_dictation.cli --model 'tiny' --hold-key 'fn' --language 'en' --menubar" in launcher
 
 
-def test_applescript_launcher_runs_zsh_launcher_for_double_click_apps():
-    launcher = render_launcher_script(
+def test_native_launcher_execs_repo_python_without_applescript_wrapper():
+    source = render_native_launcher_source(
         repo_dir=Path("/Users/mikka/open-transcribe-studio"),
-        model="tiny",
+        model="base",
         hold_key="fn",
         language="en",
     )
-    applescript = render_applescript_launcher(launcher)
 
-    assert 'do shell script "/bin/zsh -lc " & quoted form of' in applescript
-    assert "WhisperType launch" in applescript
-    assert ".venv/bin/python" in applescript
+    assert 'const char *repo = "/Users/mikka/open-transcribe-studio";' in source
+    assert 'execl(' in source
+    assert '".venv/bin/python"' in source
+    assert '"app.mac_dictation.cli"' in source
+    assert '"--menubar"' in source
+    assert 'do shell script' not in source
+    assert 'osascript' not in source
+
 
 def test_build_app_bundle_writes_macos_app_structure(tmp_path):
     app_path = build_app_bundle(
@@ -87,7 +93,12 @@ def test_build_app_bundle_writes_macos_app_structure(tmp_path):
     )
 
     assert app_path == tmp_path / "WhisperType.app"
-    assert (app_path / "Contents" / "Info.plist").exists()
+    info_plist = app_path / "Contents" / "Info.plist"
+    assert info_plist.exists()
+    with info_plist.open("rb") as handle:
+        info = plistlib.load(handle)
+    assert info["CFBundleIdentifier"] == BUNDLE_IDENTIFIER
+    assert info["NSMicrophoneUsageDescription"]
     launcher = app_path / "Contents" / "MacOS" / "WhisperType"
     assert launcher.exists()
     assert launcher.stat().st_mode & 0o111
