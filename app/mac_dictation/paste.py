@@ -13,9 +13,12 @@ class MacClipboardTyper:
     """
 
     def paste_text(self, text: str) -> None:
+        print(f"[WhisperType] copying {len(text)} characters to clipboard", flush=True)
         subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
         if platform.system() == "Darwin":
+            print("[WhisperType] sending Cmd+V with Quartz", flush=True)
             self._press_cmd_v_with_quartz()
+            print("[WhisperType] paste command sent", flush=True)
             return
         subprocess.run(
             ["osascript", "-e", 'tell application "System Events" to keystroke "v" using command down'],
