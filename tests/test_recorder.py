@@ -26,3 +26,11 @@ def test_recorder_keeps_explicit_sample_rate_override():
 
     assert resolved == 16000
     assert recorder.sample_rate == 16000
+
+
+def test_recorder_logs_resolved_sample_rate(capsys):
+    recorder = WavHoldRecorder(sample_rate=48000)
+
+    recorder._log_sample_rate()
+
+    assert "[WhisperType] recording sample rate: 48000 Hz" in capsys.readouterr().out

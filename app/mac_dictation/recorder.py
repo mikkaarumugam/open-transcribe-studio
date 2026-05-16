@@ -24,6 +24,9 @@ class WavHoldRecorder:
         self.sample_rate = default_sample_rate
         return default_sample_rate
 
+    def _log_sample_rate(self) -> None:
+        print(f"[WhisperType] recording sample rate: {self.sample_rate} Hz", flush=True)
+
     @property
     def peak_sample(self) -> int:
         return self._peak_sample
@@ -48,6 +51,7 @@ class WavHoldRecorder:
                 self._peak_sample = max(self._peak_sample, max(abs(sample) for sample in samples))
 
         sample_rate = self._resolve_sample_rate(sd)
+        self._log_sample_rate()
         self._stream = sd.RawInputStream(
             samplerate=sample_rate,
             channels=self.channels,
