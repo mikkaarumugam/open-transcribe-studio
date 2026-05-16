@@ -16,7 +16,8 @@ def main() -> None:
     parser.add_argument("--hold-key", default="fn", help="Key to hold for recording. Default: fn. Fallback examples: f18, option_r")
     args = parser.parse_args()
 
-    if platform.system() != "Darwin":
+    is_macos = platform.system() == "Darwin"
+    if not is_macos:
         print("Warning: global paste is designed for macOS. Tests can run elsewhere, but the app should be used on your Mac.")
 
     controller = DictationController(
@@ -26,7 +27,16 @@ def main() -> None:
     )
     print("WhisperType is running.")
     print(f"Hold {args.hold_key} to record. Release {args.hold_key} to transcribe and paste.")
-    print("If fn is not detected on your Mac, try: --hold-key f18")
+
+    if is_macos and args.hold_key.lower() == "fn":
+        print("Using native macOS fn/Globe detection via Quartz flags.")
+        print("If this fails, re-check Accessibility + Input Monitoring permissions, then quit/reopen Terminal.")
+        from app.mac_dictation.macos_fn import MacFnEventTapListener
+
+        MacFnEventTapListener(controller=controller).run_forever()
+        return
+
+    print("Using generic key listener. If fn is not detected on your Mac, try: --hold-key f18")
     HoldKeyListener(controller=controller, hold_key=args.hold_key).run_forever()
 
 

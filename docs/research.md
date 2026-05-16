@@ -46,4 +46,4 @@ This workflow needs:
 
 ## Known risk
 
-macOS may not expose the physical `fn` / Globe key to all Python keyboard listener libraries. WhisperType defaults to `fn`, but keeps `--hold-key` configurable so we can test fallback mappings like `f18` on the actual Mac.
+Generic keyboard libraries may not expose the physical `fn` / Globe key as a normal key-down/key-up pair. In Mikka's Mac test, `pynput` printed only release events with `raw=<63> normalised=<63>`. WhisperType now defaults to a native macOS Quartz event-tap listener for `fn`, using the `kCGEventFlagMaskSecondaryFn` modifier flag. The generic `--hold-key` path remains available for fallbacks like `f18`.

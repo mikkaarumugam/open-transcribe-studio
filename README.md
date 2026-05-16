@@ -31,7 +31,7 @@ Built:
 
 Important caveat:
 
-macOS can be inconsistent about exposing the physical `fn` / Globe key to Python global keyboard listeners. The app defaults to `fn` because that is the target UX. If your Mac does not expose it, run with `--hold-key f18` or another fallback key while we iterate.
+macOS can be inconsistent about exposing the physical `fn` / Globe key to generic Python keyboard listeners. WhisperType now uses native macOS Quartz modifier-flag detection for the default `fn` mode, because testing showed `pynput` may only report `fn` as a release-only raw key like `<63>`. If native `fn` detection still fails, run with `--hold-key f18` or another fallback key while we iterate.
 
 ## macOS permissions needed
 
