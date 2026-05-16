@@ -1,18 +1,35 @@
 from __future__ import annotations
 
+import platform
 import subprocess
 
 
 class MacClipboardTyper:
     """Paste text into the currently focused macOS app.
 
-    Uses pbcopy for the clipboard and AppleScript to press Cmd+V. This requires
-    macOS Accessibility permission for the terminal/app running WhisperType.
+    Uses pbcopy for the clipboard, then posts a native Cmd+V keyboard event.
+    This avoids AppleScript/System Events automation prompts, but still requires
+    macOS Accessibility permission for the app/runtime running WhisperType.
     """
 
     def paste_text(self, text: str) -> None:
         subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
+        if platform.system() == "Darwin":
+            self._press_cmd_v_with_quartz()
+            return
         subprocess.run(
             ["osascript", "-e", 'tell application "System Events" to keystroke "v" using command down'],
             check=True,
         )
+
+    def _press_cmd_v_with_quartz(self) -> None:  # pragma: no cover - macOS integration
+        import Quartz
+
+        v_keycode = 9
+        source = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
+        key_down = Quartz.CGEventCreateKeyboardEvent(source, v_keycode, True)
+        key_up = Quartz.CGEventCreateKeyboardEvent(source, v_keycode, False)
+        Quartz.CGEventSetFlags(key_down, Quartz.kCGEventFlagMaskCommand)
+        Quartz.CGEventSetFlags(key_up, Quartz.kCGEventFlagMaskCommand)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, key_down)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, key_up)
