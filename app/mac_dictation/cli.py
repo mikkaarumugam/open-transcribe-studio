@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import platform
+import threading
 from collections.abc import Callable
 
 from app.mac_dictation.controller import DictationController
@@ -12,7 +13,7 @@ from app.mac_dictation.whisper import LocalWhisperTranscriber
 
 
 def create_controller(
-    model: str = "tiny",
+    model: str = "base",
     language: str = "en",
     vad_filter: bool = False,
     min_record_seconds: float = 0.35,
@@ -36,7 +37,7 @@ def create_listener_runner(controller: DictationController, hold_key: str) -> Ca
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="WhisperType: hold fn to dictate into any macOS app")
-    parser.add_argument("--model", default="tiny", help="faster-whisper model size: tiny/base/small/medium/large-v3")
+    parser.add_argument("--model", default="base", help="faster-whisper model size: tiny/base/small/medium/large-v3. Default: base for better dictation accuracy.")
     parser.add_argument("--hold-key", default="fn", help="Key to hold for recording. Default: fn. Fallback examples: f18, option_r")
     parser.add_argument("--language", default="en", help="Transcription language code. Default: en. Use auto to enable Whisper auto-detection.")
     parser.add_argument("--vad-filter", action="store_true", help="Enable faster-whisper VAD filtering. Disabled by default for short live dictation clips.")
@@ -57,6 +58,9 @@ def main() -> None:
     run_listener = create_listener_runner(controller=controller, hold_key=args.hold_key)
 
     if args.menubar:
+        warm_up = getattr(controller.transcriber, "warm_up", None)
+        if callable(warm_up):
+            threading.Thread(target=warm_up, name="WhisperTypeModelWarmup", daemon=True).start()
         from app.mac_dictation.menubar import WhisperTypeMenuBarApp
 
         WhisperTypeMenuBarApp(run_listener=run_listener).run()

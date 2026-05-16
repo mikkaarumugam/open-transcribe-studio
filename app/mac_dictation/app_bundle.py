@@ -14,7 +14,7 @@ def _single_quote(value: str) -> str:
 
 def render_launcher_script(
     repo_dir: Path,
-    model: str = "tiny",
+    model: str = "base",
     hold_key: str = "fn",
     language: str = "en",
 ) -> str:
@@ -37,7 +37,7 @@ exec >> "$LOG_FILE" 2>&1
 echo "--- WhisperType launch $(date) ---"
 REPO_DIR={quoted_repo}
 if [ ! -d "$REPO_DIR" ]; then
-  osascript -e "display alert \"WhisperType repo not found\" message \"The app was built for: $REPO_DIR. Rebuild it from the real open-transcribe-studio folder with: whispertype-build-app --repo-dir \\\"$PWD\\\" --model tiny --language en\""
+  osascript -e "display alert \"WhisperType repo not found\" message \"The app was built for: $REPO_DIR. Rebuild it from the real open-transcribe-studio folder with: whispertype-build-app --repo-dir \\\"$PWD\\\" --model base --language en\""
   echo "repo path does not exist: $REPO_DIR"
   exit 1
 fi
@@ -143,7 +143,7 @@ def _write_applescript_app(
 def build_app_bundle(
     output_dir: Path,
     repo_dir: Path,
-    model: str = "tiny",
+    model: str = "base",
     hold_key: str = "fn",
     language: str = "en",
 ) -> Path:
@@ -177,7 +177,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build a local WhisperType.app launcher")
     parser.add_argument("--output-dir", default="dist", help="Directory where WhisperType.app is written")
     parser.add_argument("--repo-dir", default=".", help="Path to this repository on your Mac")
-    parser.add_argument("--model", default="tiny", help="Whisper model used by the app")
+    parser.add_argument("--model", default="base", help="Whisper model used by the app. Default: base for better dictation accuracy.")
     parser.add_argument("--hold-key", default="fn", help="Hold key used by the app")
     parser.add_argument("--language", default="en", help="Language code, or auto for detection")
     args = parser.parse_args()

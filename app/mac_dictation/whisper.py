@@ -18,6 +18,11 @@ class LocalWhisperTranscriber:
             self._model = WhisperModel(self.model_size, device="cpu", compute_type="int8")
         return self._model
 
+    def warm_up(self) -> None:
+        print(f"[WhisperType] loading Whisper model: {self.model_size}", flush=True)
+        self._load_model()
+        print(f"[WhisperType] Whisper model ready: {self.model_size}", flush=True)
+
     def transcribe(self, path: str) -> str:
         model = self._load_model()
         kwargs = {"beam_size": 5, "vad_filter": self.vad_filter, "task": "transcribe"}

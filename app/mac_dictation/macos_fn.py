@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import traceback
+import threading
 from dataclasses import dataclass
 from typing import Callable
 
@@ -31,7 +32,11 @@ class MacFnStateTracker:
             self.is_fn_down = False
             if self.on_state_change is not None:
                 self.on_state_change("up")
-            self.controller.on_fn_up()
+            threading.Thread(
+                target=self.controller.on_fn_up,
+                name="WhisperTypeTranscription",
+                daemon=True,
+            ).start()
 
 
 class MacFnEventTapListener:
