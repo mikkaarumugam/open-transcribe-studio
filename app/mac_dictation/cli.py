@@ -14,11 +14,12 @@ from app.mac_dictation.whisper import LocalWhisperTranscriber
 def create_controller(
     model: str = "tiny",
     language: str = "en",
+    vad_filter: bool = False,
     min_record_seconds: float = 0.35,
 ) -> DictationController:
     return DictationController(
         recorder=WavHoldRecorder(),
-        transcriber=LocalWhisperTranscriber(model_size=model, language=language),
+        transcriber=LocalWhisperTranscriber(model_size=model, language=language, vad_filter=vad_filter),
         typer=MacClipboardTyper(),
         min_record_seconds=min_record_seconds,
     )
@@ -38,6 +39,7 @@ def main() -> None:
     parser.add_argument("--model", default="tiny", help="faster-whisper model size: tiny/base/small/medium/large-v3")
     parser.add_argument("--hold-key", default="fn", help="Key to hold for recording. Default: fn. Fallback examples: f18, option_r")
     parser.add_argument("--language", default="en", help="Transcription language code. Default: en. Use auto to enable Whisper auto-detection.")
+    parser.add_argument("--vad-filter", action="store_true", help="Enable faster-whisper VAD filtering. Disabled by default for short live dictation clips.")
     parser.add_argument("--min-record-seconds", type=float, default=0.35, help="Ignore accidental fn taps shorter than this many seconds. Default: 0.35")
     parser.add_argument("--menubar", action="store_true", help="Run as a macOS menu bar app instead of a terminal foreground process")
     args = parser.parse_args()
@@ -49,6 +51,7 @@ def main() -> None:
     controller = create_controller(
         model=args.model,
         language=args.language,
+        vad_filter=args.vad_filter,
         min_record_seconds=args.min_record_seconds,
     )
     run_listener = create_listener_runner(controller=controller, hold_key=args.hold_key)

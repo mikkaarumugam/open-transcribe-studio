@@ -33,7 +33,7 @@ def test_local_whisper_forces_english_by_default():
     assert model.calls == [
         (
             "/tmp/audio.wav",
-            {"beam_size": 5, "vad_filter": True, "language": "en", "task": "transcribe"},
+            {"beam_size": 5, "vad_filter": False, "language": "en", "task": "transcribe"},
         )
     ]
 

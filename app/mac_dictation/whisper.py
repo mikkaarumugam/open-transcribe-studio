@@ -6,9 +6,10 @@ from pathlib import Path
 class LocalWhisperTranscriber:
     """Local faster-whisper adapter used by the global dictation tool."""
 
-    def __init__(self, model_size: str = "tiny", language: str = "en"):
+    def __init__(self, model_size: str = "tiny", language: str = "en", vad_filter: bool = False):
         self.model_size = model_size
         self.language = language
+        self.vad_filter = vad_filter
         self._model = None
 
     def _load_model(self):
@@ -19,8 +20,11 @@ class LocalWhisperTranscriber:
 
     def transcribe(self, path: str) -> str:
         model = self._load_model()
-        kwargs = {"beam_size": 5, "vad_filter": True, "task": "transcribe"}
+        kwargs = {"beam_size": 5, "vad_filter": self.vad_filter, "task": "transcribe"}
         if self.language.lower() != "auto":
             kwargs["language"] = self.language
+        print(f"[WhisperType] whisper kwargs: {kwargs}", flush=True)
         segments, _info = model.transcribe(str(Path(path)), **kwargs)
-        return " ".join(segment.text.strip() for segment in segments).strip()
+        text = " ".join(segment.text.strip() for segment in segments).strip()
+        print(f"[WhisperType] raw transcription: {text!r}", flush=True)
+        return text
