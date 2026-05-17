@@ -41,6 +41,30 @@ def show_input_monitoring_denied_alert() -> None:
         pass
 
 
+def show_open_accessibility_settings_alert() -> None:
+    """Open the macOS Privacy settings page for global-key permissions."""
+    try:
+        import subprocess
+
+        subprocess.run(
+            [
+                "osascript",
+                "-e",
+                'display alert "WhisperType needs Accessibility" message "The menu-bar app is running, but macOS is not sending fn/Globe events to the background worker. Open Accessibility settings, add WhisperType.app and Python.app/Python 3, enable them, then quit and reopen WhisperType." buttons {"Open Settings", "Cancel"} default button "Open Settings"',
+            ],
+            check=False,
+        )
+        subprocess.run(
+            [
+                "open",
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            ],
+            check=False,
+        )
+    except Exception:
+        pass
+
+
 def request_microphone_permission(timeout_seconds: float = 10.0) -> bool | None:
     """Ask macOS for microphone access for the current process if possible.
 

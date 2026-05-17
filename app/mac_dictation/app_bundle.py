@@ -93,6 +93,12 @@ static NSStatusItem *statusItem = nil;
 @end
 
 @implementation WhisperTypeAppDelegate
+- (void)openAccessibilitySettings:(id)sender {{
+    (void)sender;
+    NSURL *url = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"];
+    [[NSWorkspace sharedWorkspace] openURL:url];
+}}
+
 - (void)quitWhisperType:(id)sender {{
     (void)sender;
     if (child_pid > 0) {{
@@ -195,6 +201,9 @@ int main(int argc, char **argv) {{
 
         NSMenu *menu = [[NSMenu alloc] init];
         [menu addItemWithTitle:@"WhisperType running — hold fn to dictate" action:nil keyEquivalent:@""];
+        NSMenuItem *settingsItem = [[NSMenuItem alloc] initWithTitle:@"Open Accessibility Settings" action:@selector(openAccessibilitySettings:) keyEquivalent:@""];
+        [settingsItem setTarget:delegate];
+        [menu addItem:settingsItem];
         [menu addItem:[NSMenuItem separatorItem]];
         NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit WhisperType" action:@selector(quitWhisperType:) keyEquivalent:@"q"];
         [quitItem setTarget:delegate];
