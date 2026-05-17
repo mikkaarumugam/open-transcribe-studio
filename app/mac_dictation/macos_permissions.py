@@ -19,6 +19,28 @@ def show_microphone_denied_alert() -> None:
         pass
 
 
+def show_input_monitoring_denied_alert() -> None:
+    """Tell the user when the fn/global-key listener cannot start.
+
+    This is intentionally best-effort: the real diagnostic is still written to
+    ~/Library/Logs/WhisperType/launcher.log, but a silent background worker
+    crash makes the app feel dead from the menu bar.
+    """
+    try:
+        import subprocess
+
+        subprocess.run(
+            [
+                "osascript",
+                "-e",
+                'display alert "WhisperType fn key blocked" message "WhisperType can show WT, but macOS is blocking the background fn-key listener. Open System Settings → Privacy & Security → Accessibility and Input Monitoring, then allow WhisperType and Python 3. Quit and reopen WhisperType after changing permissions." as critical',
+            ],
+            check=False,
+        )
+    except Exception:
+        pass
+
+
 def request_microphone_permission(timeout_seconds: float = 10.0) -> bool | None:
     """Ask macOS for microphone access for the current process if possible.
 

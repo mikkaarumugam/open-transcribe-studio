@@ -161,6 +161,7 @@ static int start_python_worker(const char *repo) {{
             "{hold_key_c}",
             "--language",
             "{language_c}",
+            "--native-worker",
             (char *)NULL
         );
         fprintf(stderr, "failed to exec %s: %s\\n", python, strerror(errno));

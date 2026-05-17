@@ -43,6 +43,11 @@ def main() -> None:
     parser.add_argument("--vad-filter", action="store_true", help="Enable faster-whisper VAD filtering. Disabled by default for short live dictation clips.")
     parser.add_argument("--min-record-seconds", type=float, default=0.35, help="Ignore accidental fn taps shorter than this many seconds. Default: 0.35")
     parser.add_argument("--menubar", action="store_true", help="Run as a macOS menu bar app instead of a terminal foreground process")
+    parser.add_argument(
+        "--native-worker",
+        action="store_true",
+        help="Internal mode used by the native WhisperType.app launcher: request permissions, then run the listener without creating a second menu bar item.",
+    )
     args = parser.parse_args()
 
     is_macos = platform.system() == "Darwin"
@@ -57,16 +62,18 @@ def main() -> None:
     )
     run_listener = create_listener_runner(controller=controller, hold_key=args.hold_key)
 
-    if args.menubar:
+    if args.menubar or args.native_worker:
         from app.mac_dictation.macos_permissions import (
             request_microphone_permission,
+            show_input_monitoring_denied_alert,
             show_microphone_denied_alert,
         )
 
+        mode_name = "native worker" if args.native_worker else "menu-bar app runtime"
         microphone_allowed = request_microphone_permission()
         if microphone_allowed is False:
             print(
-                "[WhisperType] microphone permission denied for menu-bar app runtime; "
+                f"[WhisperType] microphone permission denied for {mode_name}; "
                 "not starting broken silent dictation",
                 flush=True,
             )
@@ -75,6 +82,18 @@ def main() -> None:
         warm_up = getattr(controller.transcriber, "warm_up", None)
         if callable(warm_up):
             threading.Thread(target=warm_up, name="WhisperTypeModelWarmup", daemon=True).start()
+
+        if args.native_worker:
+            print("[WhisperType] native worker is running; hold fn to record", flush=True)
+            try:
+                run_listener()
+            except Exception as exc:
+                print(f"[WhisperType] native worker listener crashed: {exc}", flush=True)
+                if "event tap" in str(exc).lower() or "accessibility" in str(exc).lower() or "input monitoring" in str(exc).lower():
+                    show_input_monitoring_denied_alert()
+                raise
+            return
+
         from app.mac_dictation.menubar import WhisperTypeMenuBarApp
 
         WhisperTypeMenuBarApp(run_listener=run_listener).run()
