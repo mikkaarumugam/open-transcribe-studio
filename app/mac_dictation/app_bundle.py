@@ -92,6 +92,14 @@ def render_native_launcher_source(
 static pid_t child_pid = -1;
 static NSStatusItem *statusItem = nil;
 static NSMenuItem *hotkeyDisplayItem = nil;
+static NSMenuItem *modelDisplayItem = nil;
+
+// Configurable Whisper model loaded from ~/.config/whispertype/model.txt.
+// Falls back to the build-time default baked in below if the file is missing
+// or contains a value we do not recognise.
+static char current_model[64] = "{model_c}";
+static const char *VALID_MODELS[] = {{ "tiny", "base", "small", "medium", "large-v3" }};
+static const int VALID_MODELS_COUNT = 5;
 
 // Hotkey detection lives in the launcher (not in the Python worker) so macOS
 // Input Monitoring trust attaches to WhisperType.app — the bundle the user
@@ -185,6 +193,67 @@ static void save_hotkey_config_to_disk(void) {{
         current_hotkey.label);
     fclose(f);
     printf("[WhisperType] hotkey config saved: %s\\n", current_hotkey.label);
+}}
+
+static bool model_is_valid(const char *name) {{
+    for (int i = 0; i < VALID_MODELS_COUNT; i++) {{
+        if (strcmp(name, VALID_MODELS[i]) == 0) return true;
+    }}
+    return false;
+}}
+
+static void model_config_path(char *out, size_t out_len) {{
+    const char *home = getenv("HOME");
+    if (!home) home = "";
+    snprintf(out, out_len, "%s/.config/whispertype/model.txt", home);
+}}
+
+static void load_model_from_disk(void) {{
+    char path[4096];
+    model_config_path(path, sizeof(path));
+    FILE *f = fopen(path, "r");
+    if (!f) {{
+        printf("[WhisperType] model config not found at %s; using default %s\\n", path, current_model);
+        return;
+    }}
+    char line[128];
+    if (fgets(line, sizeof(line), f) != NULL) {{
+        size_t len = strlen(line);
+        while (len > 0 && (line[len - 1] == '\\n' || line[len - 1] == '\\r' || line[len - 1] == ' ')) {{
+            line[--len] = '\\0';
+        }}
+        if (model_is_valid(line)) {{
+            strncpy(current_model, line, sizeof(current_model) - 1);
+            current_model[sizeof(current_model) - 1] = '\\0';
+            printf("[WhisperType] model config loaded: %s\\n", current_model);
+        }} else {{
+            printf("[WhisperType] model config %s is not recognised; falling back to %s\\n", line, current_model);
+        }}
+    }}
+    fclose(f);
+}}
+
+static void save_model_to_disk(const char *model) {{
+    if (!model_is_valid(model)) {{
+        printf("[WhisperType] refusing to save unknown model: %s\\n", model);
+        return;
+    }}
+    const char *home = getenv("HOME");
+    if (!home) return;
+    char dir1[4096], dir2[4096], path[4096];
+    snprintf(dir1, sizeof(dir1), "%s/.config", home);
+    mkdir(dir1, 0755);
+    snprintf(dir2, sizeof(dir2), "%s/.config/whispertype", home);
+    mkdir(dir2, 0755);
+    model_config_path(path, sizeof(path));
+    FILE *f = fopen(path, "w");
+    if (!f) {{
+        printf("[WhisperType] could not write model config to %s: %s\\n", path, strerror(errno));
+        return;
+    }}
+    fprintf(f, "%s\\n", model);
+    fclose(f);
+    printf("[WhisperType] model config saved: %s\\n", model);
 }}
 
 static void write_hotkey_event(const char *event) {{
@@ -291,6 +360,8 @@ static void start_fn_event_tap(void) {{
 - (void)quitWhisperType:(id)sender;
 - (void)setHotkey:(id)sender;
 - (void)refreshHotkeyMenuLabel;
+- (void)refreshModelMenuLabel;
+- (void)pickModel:(id)sender;
 - (void)openAccessibilitySettings:(id)sender;
 - (void)openInputMonitoringSettings:(id)sender;
 @end
@@ -314,6 +385,36 @@ static void start_fn_event_tap(void) {{
         NSString *title = [NSString stringWithFormat:@"Hotkey: %s", current_hotkey.label];
         [hotkeyDisplayItem setTitle:title];
     }}
+}}
+
+- (void)refreshModelMenuLabel {{
+    if (modelDisplayItem != nil) {{
+        NSString *title = [NSString stringWithFormat:@"Model: %s", current_model];
+        [modelDisplayItem setTitle:title];
+    }}
+}}
+
+- (void)pickModel:(id)sender {{
+    NSMenuItem *item = (NSMenuItem *)sender;
+    NSString *chosen = [item title];
+    const char *cChosen = [chosen UTF8String];
+    if (!model_is_valid(cChosen)) {{
+        printf("[WhisperType] ignored unknown model from menu: %s\\n", cChosen);
+        return;
+    }}
+    save_model_to_disk(cChosen);
+    strncpy(current_model, cChosen, sizeof(current_model) - 1);
+    current_model[sizeof(current_model) - 1] = '\\0';
+    [self refreshModelMenuLabel];
+
+    NSAlert *alert = [[NSAlert alloc] init];
+    [alert setMessageText:@"Model will change after restart"];
+    NSString *info = [NSString stringWithFormat:
+        @"WhisperType will use the %s model the next time you open it.\\n\\nQuit WhisperType from the menu bar and reopen it to apply the change. The first time you use a new model, Whisper will download it (small ≈ 480 MB, medium ≈ 1.5 GB, large-v3 ≈ 3 GB), so give it a moment.",
+        cChosen];
+    [alert setInformativeText:info];
+    [alert addButtonWithTitle:@"OK"];
+    [alert runModal];
 }}
 
 - (void)quitWhisperType:(id)sender {{
@@ -502,7 +603,7 @@ static int start_python_worker(const char *repo) {{
             "-m",
             "app.mac_dictation.cli",
             "--model",
-            "{model_c}",
+            current_model,
             "--hold-key",
             "{hold_key_c}",
             "--language",
@@ -544,16 +645,34 @@ int main(int argc, char **argv) {{
         [statusItem.button setToolTip:@"WhisperType is running — hold fn to dictate"];
 
         load_hotkey_config_from_disk();
+        load_model_from_disk();
 
         NSMenu *menu = [[NSMenu alloc] init];
         [menu addItemWithTitle:@"WhisperType running — hold hotkey to dictate" action:nil keyEquivalent:@""];
         NSString *hotkeyTitle = [NSString stringWithFormat:@"Hotkey: %s", current_hotkey.label];
         hotkeyDisplayItem = [[NSMenuItem alloc] initWithTitle:hotkeyTitle action:nil keyEquivalent:@""];
         [menu addItem:hotkeyDisplayItem];
+        NSString *modelTitle = [NSString stringWithFormat:@"Model: %s", current_model];
+        modelDisplayItem = [[NSMenuItem alloc] initWithTitle:modelTitle action:nil keyEquivalent:@""];
+        [menu addItem:modelDisplayItem];
         [menu addItem:[NSMenuItem separatorItem]];
         NSMenuItem *setHotkeyItem = [[NSMenuItem alloc] initWithTitle:@"Set hotkey…" action:@selector(setHotkey:) keyEquivalent:@""];
         [setHotkeyItem setTarget:delegate];
         [menu addItem:setHotkeyItem];
+
+        NSMenuItem *modelItem = [[NSMenuItem alloc] initWithTitle:@"Model" action:nil keyEquivalent:@""];
+        NSMenu *modelSubmenu = [[NSMenu alloc] initWithTitle:@"Model"];
+        for (int i = 0; i < VALID_MODELS_COUNT; i++) {{
+            NSString *name = [NSString stringWithUTF8String:VALID_MODELS[i]];
+            NSMenuItem *opt = [[NSMenuItem alloc] initWithTitle:name action:@selector(pickModel:) keyEquivalent:@""];
+            [opt setTarget:delegate];
+            if (strcmp(VALID_MODELS[i], current_model) == 0) {{
+                [opt setState:NSControlStateValueOn];
+            }}
+            [modelSubmenu addItem:opt];
+        }}
+        [modelItem setSubmenu:modelSubmenu];
+        [menu addItem:modelItem];
         NSMenuItem *settingsItem = [[NSMenuItem alloc] initWithTitle:@"Open Accessibility Settings" action:@selector(openAccessibilitySettings:) keyEquivalent:@""];
         [settingsItem setTarget:delegate];
         [menu addItem:settingsItem];

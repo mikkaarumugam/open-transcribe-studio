@@ -122,6 +122,32 @@ def test_native_launcher_supports_configurable_hotkey_with_capture_ui():
     assert "refreshHotkeyMenuLabel" in source
 
 
+def test_native_launcher_supports_configurable_whisper_model_via_menu():
+    # End-user goal: pick the Whisper model from the menu bar.
+    # Saved to ~/.config/whispertype/model.txt, read on launch, and
+    # the launcher passes it to --model when execing Python.
+    source = render_native_launcher_source(
+        repo_dir=Path("/Users/mikka/open-transcribe-studio"),
+        model="base",
+        hold_key="fn",
+        language="en",
+    )
+
+    assert "load_model_from_disk" in source
+    assert "save_model_to_disk" in source
+    assert ".config/whispertype/model.txt" in source
+    assert "current_model" in source
+    assert 'VALID_MODELS' in source
+    assert '"tiny"' in source and '"small"' in source and '"medium"' in source and '"large-v3"' in source
+
+    assert '"--model",\n            current_model' in source
+
+    assert "pickModel:" in source
+    assert "Model: %s" in source
+    assert "refreshModelMenuLabel" in source
+    assert "Model will change after restart" in source
+
+
 def test_native_launcher_owns_fn_event_tap_so_trust_attaches_to_bundle():
     # macOS TCC binds Input Monitoring trust to the binary that calls
     # CGEventTapCreate. The bundle must own that call so the user's grant

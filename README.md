@@ -25,7 +25,7 @@ What works today:
 - Global hold-to-dictate on macOS, runs from a real `.app` bundle so you can launch it from Spotlight or Finder like any normal Mac app.
 - Configurable hotkey. Default is `fn` / Globe, change it any time from the menu bar via *Set hotkey…*. Your choice persists to `~/.config/whispertype/hotkey.txt`.
 - Local microphone recording while the key is held.
-- Local transcription with `faster-whisper`. Defaults to English so it does not hallucinate other languages.
+- Local transcription with `faster-whisper`. Defaults to English so it does not hallucinate other languages. Model is configurable from the menu bar (tiny / base / small / medium / large-v3), persists to `~/.config/whispertype/model.txt`.
 - Clipboard + Cmd+V paste into the active app.
 - Menu bar shortcuts to the macOS permissions panes (*Open Accessibility Settings*, *Open Input Monitoring Settings*).
 - Light cleanup: trims um/uh fillers, fixes spacing, capitalises, adds final punctuation.
@@ -61,6 +61,33 @@ WhisperType is local-first. Nothing is uploaded anywhere. But two things do get 
 
 - **A log file** at `~/Library/Logs/WhisperType/launcher.log`. This includes diagnostic lines AND the transcribed text of what you said (so you can debug bad transcriptions). It is plain text. Read it with `tail -80 ~/Library/Logs/WhisperType/launcher.log`. Wipe it any time with `rm ~/Library/Logs/WhisperType/launcher.log`.
 - **A temporary `.wav` recording per hotkey press**, written to the macOS temp folder (`/var/folders/.../T/whispertype-*.wav`) so Whisper can read it. WhisperType deletes each one as soon as transcription finishes. If you ever want to double-check nothing is sitting around, run `ls /var/folders/*/T/whispertype-*.wav 2>/dev/null` (no output = nothing there).
+
+## Choosing a Whisper model
+
+WhisperType uses [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper), which ships several model sizes. Bigger models are more accurate but slower and bigger on disk. For hotkey-style dictation (short clips, mostly clear English), **`base` is the sweet spot** and it is the default.
+
+| Model | Disk | Speed on a Mac | Accuracy | When to pick it |
+|---|---|---|---|---|
+| `tiny` | ~75 MB | fastest | weakest | Smoke-testing setup only. Will mishear short or accented speech. |
+| **`base`** | ~150 MB | fast | decent | **Default.** Good for clear English dictation on a typical Mac. |
+| `small` | ~480 MB | slower | noticeably better | Bump to this if `base` keeps mishearing your accent, common words, or background noise. |
+| `medium` | ~1.5 GB | slow | strong | Overkill for short dictation. Useful if your audio is long or hard. |
+| `large-v3` | ~3 GB | slowest | best | Way overkill for hotkey dictation. Adds seconds of delay per phrase. |
+
+### Change the model from the menu bar
+
+Click `WT` → *Model* → pick one. WhisperType saves your choice to `~/.config/whispertype/model.txt` and shows an alert telling you to quit and reopen the app for the new model to take effect.
+
+**First time you pick a new model, Whisper will download it.** This is a one-time cost per model, cached under `~/.cache/huggingface/`. Plan for a few minutes on the bigger ones (`small` ≈ 480 MB, `medium` ≈ 1.5 GB, `large-v3` ≈ 3 GB).
+
+You can also pick a model at the command line when running from Terminal, or when building the `.app`:
+
+```bash
+whispertype --model small
+.venv/bin/whispertype-build-app --model small
+```
+
+The CLI flag controls the *initial default*; the menu choice overrides it on next launch.
 
 ## Install on your Mac
 
