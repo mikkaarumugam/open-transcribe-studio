@@ -11,6 +11,7 @@ from app.mac_dictation.controller import DictationController
 # Quartz.kCGEventFlagMaskSecondaryFn on modern macOS, but keeping the numeric
 # constant here lets us unit-test the state machine on Linux too.
 FN_FLAG_MASK = 1 << 23
+FN_KEYCODE = 63
 
 
 @dataclass
@@ -22,7 +23,16 @@ class MacFnStateTracker:
     on_state_change: Callable[[str], None] | None = None
 
     def handle_flags(self, flags: int) -> None:
+        self.handle_event(flags=flags, keycode=None)
+
+    def handle_event(self, flags: int, keycode: int | None = None) -> None:
         fn_down_now = bool(int(flags) & FN_FLAG_MASK)
+        if keycode == FN_KEYCODE and not fn_down_now:
+            # Some Mac keyboards expose Globe/Fn as a flagsChanged event with
+            # keycode 63 but without kCGEventFlagMaskSecondaryFn. In that case
+            # the press and release arrive as two keycode-63 events, so toggle
+            # state rather than waiting for a flag bit that never appears.
+            fn_down_now = not self.is_fn_down
         if fn_down_now and not self.is_fn_down:
             self.is_fn_down = True
             if self.on_state_change is not None:
@@ -58,8 +68,9 @@ class MacFnEventTapListener:
 
         if event_type == Quartz.kCGEventFlagsChanged:
             flags = Quartz.CGEventGetFlags(event)
+            keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
             try:
-                self.tracker.handle_flags(flags)
+                self.tracker.handle_event(flags=flags, keycode=keycode)
             except Exception:
                 print("[WhisperType] fn event handler crashed", flush=True)
                 traceback.print_exc()
