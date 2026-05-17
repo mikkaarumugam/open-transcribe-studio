@@ -1,3 +1,6 @@
+import tempfile
+from pathlib import Path
+
 from app.mac_dictation.clean_text import clean_dictation_text
 from app.mac_dictation.controller import DictationController
 
@@ -107,3 +110,47 @@ def test_controller_does_not_transcribe_or_paste_silent_recording():
     assert transcriber.path is None
     assert typer.text is None
     assert statuses == ["recording", "silence", "idle"]
+
+
+class TempFileRecorder:
+    """Writes a real (empty) wav-like file so we can assert it gets deleted."""
+
+    def __init__(self, peak_sample: int = 100):
+        self.peak_sample = peak_sample
+        self.output_path: str | None = None
+
+    def start(self):
+        pass
+
+    def stop(self):
+        fd, path = tempfile.mkstemp(prefix="whispertype-test-", suffix=".wav")
+        with open(fd, "wb") as handle:
+            handle.write(b"fake audio")
+        self.output_path = path
+        return path
+
+
+def test_controller_deletes_temp_recording_after_transcription():
+    recorder = TempFileRecorder()
+    transcriber = FakeTranscriber()
+    typer = FakeTyper()
+    controller = DictationController(recorder=recorder, transcriber=transcriber, typer=typer, min_record_seconds=0)
+
+    controller.on_fn_down()
+    controller.on_fn_up()
+
+    assert recorder.output_path is not None
+    assert not Path(recorder.output_path).exists(), "temp wav should be cleaned up after transcription"
+
+
+def test_controller_deletes_temp_recording_even_when_silent():
+    recorder = TempFileRecorder(peak_sample=0)
+    transcriber = FakeTranscriber()
+    typer = FakeTyper()
+    controller = DictationController(recorder=recorder, transcriber=transcriber, typer=typer, min_record_seconds=0)
+
+    controller.on_fn_down()
+    controller.on_fn_up()
+
+    assert recorder.output_path is not None
+    assert not Path(recorder.output_path).exists(), "silent capture should also be cleaned up"

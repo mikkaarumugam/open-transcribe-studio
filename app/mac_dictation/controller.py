@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from time import monotonic
 from typing import Callable, Protocol
@@ -65,6 +66,7 @@ class DictationController:
         started_at = self._recording_started_at
         self._recording_started_at = None
         print("[WhisperType] stopping microphone recording", flush=True)
+        audio_path: str | None = None
         try:
             audio_path = self.recorder.stop()
             duration = self.clock() - started_at if started_at is not None else 0.0
@@ -94,4 +96,9 @@ class DictationController:
             else:
                 print("[WhisperType] transcription was empty after cleanup", flush=True)
         finally:
+            if audio_path is not None:
+                try:
+                    os.unlink(audio_path)
+                except OSError:
+                    pass
             self._set_status("idle")
