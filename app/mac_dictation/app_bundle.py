@@ -636,18 +636,26 @@ static int restart_python_worker(void);
         const char *name = VALID_MODELS[i];
         NSString *nsName = [NSString stringWithUTF8String:name];
         NSMenuItem *item;
-        if (model_is_downloaded(name)) {{
+        // Order matters: a live download must always win over the
+        // "on disk" check. huggingface_hub creates the snapshots dir
+        // (which model_is_downloaded looks for) very early in the
+        // download, well before the model blobs actually finish. If we
+        // trusted model_is_downloaded first, the menu would lie during
+        // any in-progress download and let the user pick a model that
+        // is not actually ready, with no visible signal that they are
+        // mid-download.
+        if (download_in_progress_for(name)) {{
+            NSString *title = [NSString stringWithFormat:@"%@ — Downloading…", nsName];
+            item = [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
+            [item setRepresentedObject:nsName];
+            // action:nil + auto-enabling menu = visually disabled
+        }} else if (model_is_downloaded(name)) {{
             item = [[NSMenuItem alloc] initWithTitle:nsName action:@selector(pickModel:) keyEquivalent:@""];
             [item setTarget:self];
             [item setRepresentedObject:nsName];
             if (strcmp(name, current_model) == 0) {{
                 [item setState:NSControlStateValueOn];
             }}
-        }} else if (download_in_progress_for(name)) {{
-            NSString *title = [NSString stringWithFormat:@"%@ — Downloading…", nsName];
-            item = [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
-            [item setRepresentedObject:nsName];
-            // action:nil + auto-enabling menu = visually disabled
         }} else {{
             NSString *title = [NSString stringWithFormat:@"%@ — Download (%s)", nsName, model_size_label(name)];
             item = [[NSMenuItem alloc] initWithTitle:title action:@selector(downloadModel:) keyEquivalent:@""];

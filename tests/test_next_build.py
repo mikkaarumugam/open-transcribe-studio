@@ -221,6 +221,31 @@ def test_native_launcher_shows_per_model_downloaded_state_in_submenu():
     assert "Downloading…" in source
     assert "Download (%s)" in source
 
+    # Within rebuildModelSubmenu, the in-progress check must be evaluated
+    # before the on-disk check. huggingface_hub creates the snapshots dir
+    # early in a download (before blobs land), so model_is_downloaded
+    # returns true during an in-flight download. If the menu trusted that
+    # first, the user would see "ready" for a model that is actually
+    # still downloading, and clicking it would silently wedge dictation
+    # for several minutes while the download finishes and the worker
+    # loads the model. The lock file is the source of truth during a
+    # download — once the helper exits, it removes the lock, then
+    # model_is_downloaded takes over.
+    # Match the implementation, not the @interface forward declaration:
+    # the impl line ends with "{" while the forward decl ends with ";".
+    rebuild_start = source.index("- (void)rebuildModelSubmenu {")
+    # The next method implementation after rebuildModelSubmenu is
+    # menuNeedsUpdate:, which marks the end of the rebuild body.
+    rebuild_end = source.index("- (void)menuNeedsUpdate:(NSMenu *)menu {", rebuild_start)
+    rebuild_body = source[rebuild_start:rebuild_end]
+    in_progress_pos = rebuild_body.index("download_in_progress_for(name)")
+    downloaded_pos = rebuild_body.index("model_is_downloaded(name)")
+    assert in_progress_pos < downloaded_pos, (
+        "rebuildModelSubmenu must check download_in_progress_for(name) "
+        "BEFORE model_is_downloaded(name) — otherwise the menu shows a "
+        "model as 'ready' while it is actually still downloading."
+    )
+
 
 def test_native_launcher_owns_fn_event_tap_so_trust_attaches_to_bundle():
     # macOS TCC binds Input Monitoring trust to the binary that calls
