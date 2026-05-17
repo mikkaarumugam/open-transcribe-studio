@@ -21,39 +21,38 @@ No paid API key. No SaaS account. No server required.
 Built:
 
 - macOS-oriented global hold-to-dictate CLI.
-- Default hold key: `fn`.
+- Native macOS `.app` bundle whose tiny Obj-C launcher owns the hotkey event tap, so Input Monitoring trust binds to WhisperType itself (not the Python framework).
+- Configurable hotkey: default is `fn` / Globe, change it any time from the menu bar via *Set hotkey…*; persists to `~/.config/whispertype/hotkey.txt`.
 - Local microphone recording while the key is held.
 - Local transcription with `faster-whisper`, forced to English by default to avoid wrong-language hallucinations.
 - Clipboard + Cmd+V paste into the active macOS app.
-- Optional macOS menu bar mode plus a free local `.app` launcher so Terminal does not need to stay open.
+- Menu-bar shortcuts to the macOS permissions panes (*Open Accessibility Settings*, *Open Input Monitoring Settings*).
 - Lightweight cleanup: removes common fillers like “um/uh”, trims spaces, capitalizes, and adds final punctuation.
-- Tests for the dictation controller and cleanup behavior.
+- Tests for the dictation controller, hotkey config, fn listener, and bundle builder.
 - Original web transcription studio still exists as a secondary demo/API, but the main product direction is now universal voice typing.
-
-Important caveat:
-
-macOS can be inconsistent about exposing the physical `fn` / Globe key to generic Python keyboard listeners. WhisperType now uses native macOS Quartz modifier-flag detection for the default `fn` mode, because testing showed `pynput` may only report `fn` as a release-only raw key like `<63>`. If native `fn` detection still fails, run with `--hold-key f18` or another fallback key while we iterate.
 
 ## macOS permissions needed
 
-When running this on your Mac, macOS may ask for:
+WhisperType needs three macOS permissions:
 
-- Microphone permission: to record speech.
-- Accessibility permission: to simulate Cmd+V into the active app.
-- Input Monitoring permission: to detect the global hold key.
+- **Microphone** — to record speech.
+- **Accessibility** — to simulate Cmd+V into the active app.
+- **Input Monitoring** — to detect the global hold key.
 
-If it does not prompt automatically, open:
+If macOS does not prompt automatically, open **System Settings → Privacy & Security**. The `WT` menu has shortcuts: *Open Accessibility Settings* and *Open Input Monitoring Settings*.
 
-System Settings → Privacy & Security
+**Running from `dist/WhisperType.app` (recommended).** The bundle's native launcher owns the hotkey listener, so you only need to enable **WhisperType** in Accessibility and Input Monitoring — there is no separate "Python 3" row to worry about.
 
-When running from Terminal, grant permissions to the terminal app you use, for example:
+**Running from Terminal.** Grant the same permissions to whichever terminal you use (Terminal, iTerm, the Cursor or VS Code terminal, etc.).
 
-- Terminal
-- iTerm
-- Cursor terminal
-- VS Code terminal
+**Heads-up: rebuilding the `.app` resets grants.** macOS binds permission grants to the binary's code signature, not the bundle ID. Every time you run `whispertype-build-app`, the signature changes and your previous grants stop applying — even though the app name and bundle ID are identical. To recover:
 
-When running `dist/WhisperType.app`, macOS may show separate permission rows for `WhisperType` and `Python 3`. For the current free Python-powered prototype, grant Input Monitoring and Accessibility to both if `fn` is not detected or paste does not work. After changing permissions, quit `WT` from the menu bar and reopen `dist/WhisperType.app`.
+```bash
+tccutil reset ListenEvent com.mikka.open-transcribe-studio.whispertype
+tccutil reset Accessibility com.mikka.open-transcribe-studio.whispertype
+```
+
+Then reopen `dist/WhisperType.app` and re-enable WhisperType in both panes. A stable signing identity would fix this; ad-hoc-signed dev builds are why you keep hitting it.
 
 ## Install on your Mac
 
@@ -103,7 +102,9 @@ Then:
 5. Wait for transcription.
 6. Text should paste into the active app.
 
-If `fn` is not detected, first inspect what macOS exposes:
+### Terminal-mode fallback
+
+If you are running from Terminal (not the `.app`) and `fn` is not detected, first inspect what macOS exposes:
 
 ```bash
 python scripts/detect_keys.py
@@ -115,13 +116,13 @@ Press `fn` / Globe and look at the printed `normalised=` value. Then run with th
 whispertype --model tiny --hold-key f18
 ```
 
-Or try another key name that your keyboard listener can see.
-
-On Mikka's current Mac, `fn` / Globe has been seen as raw `<179>`, so this is the fastest fallback to try:
+Or try another key name that your keyboard listener can see. On Mikka's Mac, `fn` / Globe has shown up as raw `<179>`:
 
 ```bash
 whispertype --model tiny --hold-key '<179>'
 ```
+
+When you run from the `.app` bundle (recommended), this fallback is not needed — the bundle's native launcher detects `fn` / Globe directly, and any other hotkey can be set from the menu.
 
 ## Run as a menu bar app without Terminal
 
@@ -157,15 +158,19 @@ To inspect it:
 tail -80 ~/Library/Logs/WhisperType/launcher.log
 ```
 
-When `fn` detection is healthy, the log should include:
+When the hotkey is healthy, the log should include lines like:
 
 ```text
-[WhisperType] native macOS fn event tap is running
+[WhisperType] launcher CGEventTap installed (bundle owns hotkey trust)
 [WhisperType] fn down
 [WhisperType] fn up
 ```
 
-If `WT` appears but pressing `fn` does nothing and the log does not show `fn down`, re-check Input Monitoring and Accessibility for both `WhisperType` and `Python 3`, then quit and reopen the app.
+If `WT` appears in the menu bar but pressing the hotkey does nothing and the log does not show `fn down`, the most common cause is that grants reset after a rebuild — see the `tccutil reset` instructions in the macOS permissions section above, then quit and reopen the app.
+
+### Change the hotkey
+
+Click `WT` in the menu bar → *Set hotkey…*, then press the key or combo you want. The choice persists across launches.
 
 For faster local debugging, use the one-command restart loop instead of repeatedly copying the full rebuild block:
 
@@ -210,8 +215,6 @@ But the main portfolio direction is now WhisperType: voice typing anywhere on ma
 
 Next steps:
 
-- Confirm real `fn` key behavior on Mikka's Mac.
-- Add setup checker for macOS permissions.
 - Add a visible recording indicator.
 - Add silence auto-stop as an optional mode.
 - Add local text cleanup presets:
@@ -219,11 +222,31 @@ Next steps:
   - polished message;
   - email style;
   - coding prompt style.
-- Add demo GIF and portfolio case study.
+- Stable signing identity so permission grants survive rebuilds.
+- Demo GIF and portfolio case study.
 
 ## Portfolio angle
 
-This project demonstrates taking a paid AI-product workflow, identifying the highest-value feature, and rebuilding a useful free/local MVP with clear tradeoffs:
+Honest framing: this project is **vibecoded**. I am not the engineer who hand-wrote it. I'm the product person who decided what to build, what to cut, when to push back on the AI's suggestions, and when to verify on real hardware before calling something "done." I'm posting it under that framing on purpose — I'm going for AI product roles, and pretending I wrote every line would miss the point.
 
-- Glaido: polished paid universal dictation product.
-- WhisperType: free local-first proof-of-concept focused on the same core user job: speak instead of type anywhere.
+**The product decisions I made**
+
+- **Picked the core job.** Glaido does many things; voice-typing-anywhere is the one users pay for. Everything else got cut.
+- **Local over cloud.** No API keys, no accounts, no server. The tradeoff is slower transcription and a one-time model download — accepted, because it makes the tool free and private by default.
+- **Started with `fn`-only, then realised the real requirement was "the user picks their own hotkey."** Reframed the scope mid-build and added a menu-bar capture UI with on-disk persistence.
+- **Kept Terminal mode as an escape hatch.** When the bundled `.app` had permissions issues, I shipped both paths instead of waiting for a perfect fix.
+- **Named the rough edges instead of hiding them.** TCC grants reset on rebuild because of ad-hoc signing — that limitation is in the README, not buried.
+
+**How I worked with AI to ship it**
+
+- I describe the user-facing goal; the AI proposes architecture; I verify it end-to-end and push back when the diagnosis is wrong. (Example: a "fixed" version still wasn't catching `fn` events — I caught that the `.app` bundle hadn't been rebuilt, so the new Python code was running against a stale Obj-C launcher.)
+- I learned just enough vocabulary of the platform constraints (macOS TCC, code signing, why permissions don't transfer across binaries) to spot when the AI was solving the wrong problem.
+- Tests exist for the parts I needed confidence in — not because I wrote them, but because I asked for them and read the assertions before merging.
+
+**What this is meant to demonstrate**
+
+Not "I can code." The thing I'm trying to show is the modern PM job: *take a paid product's core job, scope an MVP, direct an AI to build it, verify it works on real hardware, and ship it with honest tradeoffs.* The artefact is real (it runs, my microphone is hot, the text appears) but the value of the project is the process, not the source code.
+
+**What this is not**
+
+A Glaido competitor. A polished consumer product. A demonstration of my engineering ability. A claim that AI tools made it effortless — they didn't; the work was in the spec, the verification, and the judgement calls.
