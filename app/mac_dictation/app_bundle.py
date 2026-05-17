@@ -506,6 +506,8 @@ static int restart_python_worker(void);
 - (void)rebuildModelSubmenu;
 - (void)openAccessibilitySettings:(id)sender;
 - (void)openInputMonitoringSettings:(id)sender;
+- (void)openMicrophoneSettings:(id)sender;
+- (void)resetPermissions:(id)sender;
 - (void)pollStatusIndicator:(NSTimer *)timer;
 - (void)menuNeedsUpdate:(NSMenu *)menu;
 @end
@@ -522,6 +524,61 @@ static int restart_python_worker(void);
     (void)sender;
     NSURL *url = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"];
     [[NSWorkspace sharedWorkspace] openURL:url];
+}}
+
+- (void)openMicrophoneSettings:(id)sender {{
+    (void)sender;
+    NSURL *url = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"];
+    [[NSWorkspace sharedWorkspace] openURL:url];
+}}
+
+// Runs `tccutil reset <bucket> <bundleID>` for all three permissions
+// WhisperType needs, then opens the three System Settings panes so the
+// user can re-grant in one go. This is the post-rebuild ritual: every
+// time `whispertype-build-app` produces a fresh binary, macOS treats it
+// as a new app (TCC binds grants to the code signature, not the bundle
+// ID), so the previous grants stop applying. Clicking this menu item
+// wipes the stale records and walks the user through re-granting.
+- (void)resetPermissions:(id)sender {{
+    (void)sender;
+    NSAlert *confirm = [[NSAlert alloc] init];
+    [confirm setMessageText:@"Reset WhisperType permissions?"];
+    [confirm setInformativeText:@"This clears the macOS records of WhisperType's Microphone, Input Monitoring, and Accessibility grants, then opens each Settings pane so you can re-grant.\\n\\nUse this after rebuilding the app — macOS treats every new build as a different app for permission purposes, so the previous grants stop working.\\n\\nNo personal data is touched."];
+    [confirm addButtonWithTitle:@"Reset and Reopen Settings"];
+    [confirm addButtonWithTitle:@"Cancel"];
+    NSModalResponse pick = [confirm runModal];
+    if (pick != NSAlertFirstButtonReturn) {{
+        return;
+    }}
+
+    const char *buckets[] = {{ "Microphone", "ListenEvent", "Accessibility" }};
+    for (int i = 0; i < 3; i++) {{
+        pid_t pid = fork();
+        if (pid < 0) {{
+            printf("[WhisperType] could not fork for tccutil %s: %s\\n", buckets[i], strerror(errno));
+            continue;
+        }}
+        if (pid == 0) {{
+            execl("/usr/bin/tccutil", "/usr/bin/tccutil",
+                  "reset", buckets[i], "com.mikka.open-transcribe-studio.whispertype",
+                  (char *)NULL);
+            // execl returns only on failure.
+            _exit(127);
+        }}
+        int status = 0;
+        waitpid(pid, &status, 0);
+        printf("[WhisperType] tccutil reset %s -> exit %d\\n", buckets[i], WEXITSTATUS(status));
+    }}
+
+    [self openMicrophoneSettings:nil];
+    [self openInputMonitoringSettings:nil];
+    [self openAccessibilitySettings:nil];
+
+    NSAlert *next = [[NSAlert alloc] init];
+    [next setMessageText:@"Permissions reset"];
+    [next setInformativeText:@"Now toggle WhisperType ON in all three Settings panes: Microphone, Input Monitoring, and Accessibility.\\n\\nIf the Accessibility row still does not work after toggling, click WhisperType in the list and press the minus (–) button to remove it, then drag the .app back in.\\n\\nWhen you are done, quit WhisperType from the menu bar and reopen it from /Applications."];
+    [next addButtonWithTitle:@"OK"];
+    [next runModal];
 }}
 
 - (void)refreshHotkeyMenuLabel {{
@@ -963,12 +1020,18 @@ int main(int argc, char **argv) {{
         [delegate rebuildModelSubmenu];
         [modelItem setSubmenu:modelSubmenu];
         [menu addItem:modelItem];
+        NSMenuItem *micItem = [[NSMenuItem alloc] initWithTitle:@"Open Microphone Settings" action:@selector(openMicrophoneSettings:) keyEquivalent:@""];
+        [micItem setTarget:delegate];
+        [menu addItem:micItem];
         NSMenuItem *settingsItem = [[NSMenuItem alloc] initWithTitle:@"Open Accessibility Settings" action:@selector(openAccessibilitySettings:) keyEquivalent:@""];
         [settingsItem setTarget:delegate];
         [menu addItem:settingsItem];
         NSMenuItem *inputMonItem = [[NSMenuItem alloc] initWithTitle:@"Open Input Monitoring Settings" action:@selector(openInputMonitoringSettings:) keyEquivalent:@""];
         [inputMonItem setTarget:delegate];
         [menu addItem:inputMonItem];
+        NSMenuItem *resetItem = [[NSMenuItem alloc] initWithTitle:@"Reset Permissions…" action:@selector(resetPermissions:) keyEquivalent:@""];
+        [resetItem setTarget:delegate];
+        [menu addItem:resetItem];
         [menu addItem:[NSMenuItem separatorItem]];
         NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit WhisperType" action:@selector(quitWhisperType:) keyEquivalent:@"q"];
         [quitItem setTarget:delegate];

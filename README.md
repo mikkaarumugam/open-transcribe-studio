@@ -48,7 +48,11 @@ If macOS does not prompt automatically, open **System Settings → Privacy & Sec
 
 **Running from Terminal.** Grant the same permissions to whichever terminal you use (Terminal, iTerm, the Cursor or VS Code terminal, etc.).
 
-**Heads-up: rebuilding the `.app` resets grants.** macOS ties permission grants to the binary's code signature, not the bundle ID. Every time you run `whispertype-build-app`, the signature changes and your previous grants stop applying, even though the app name and bundle ID are identical. To recover, reset all three TCC buckets and then reopen + re-grant in System Settings:
+**Heads-up: rebuilding the `.app` resets grants.** macOS ties permission grants to the binary's code signature, not the bundle ID. Every time you run `whispertype-build-app`, the signature changes and your previous grants stop applying, even though the app name and bundle ID are identical.
+
+**The one-click fix is built into the app itself.** Click `WT` → **Reset Permissions…**. It wipes the TCC records for all three buckets, opens all three System Settings panes, and tells you what to do. Toggle WhisperType on in each pane, then quit and reopen from `/Applications`.
+
+If you prefer the manual route (or the menu item is unavailable because the binary itself won't launch), the equivalent terminal commands are:
 
 ```bash
 tccutil reset Microphone com.mikka.open-transcribe-studio.whispertype
@@ -56,7 +60,14 @@ tccutil reset ListenEvent com.mikka.open-transcribe-studio.whispertype
 tccutil reset Accessibility com.mikka.open-transcribe-studio.whispertype
 ```
 
-Then reopen `dist/WhisperType.app` and re-enable WhisperType in all three panes (Microphone, Input Monitoring, Accessibility). Common symptom of forgetting Microphone: `WT ●` lights up when you hold the hotkey but no orange mic indicator appears in the macOS menu bar, and nothing gets transcribed. A proper signing identity would fix this. Ad-hoc dev builds are why you keep hitting it.
+Common symptoms of forgetting a permission:
+- **No Microphone**: `WT ●` lights up when you hold the hotkey but no orange mic indicator appears in the macOS menu bar, and nothing gets transcribed.
+- **No Accessibility**: dictation transcribes (you can see it in the log), but nothing pastes into the active app. Manual Cmd+V works; auto Cmd+V from WhisperType is silently blocked.
+- **No Input Monitoring**: pressing fn does nothing at all. Log shows no `fn down` events.
+
+If Accessibility stays stuck even after the reset (rare macOS quirk where the stale entry in the list won't rebind), click WhisperType in the Accessibility list and press the minus (–) button to remove it entirely, then drag the `.app` back in or wait for macOS to re-prompt on next dictation attempt.
+
+A proper signing identity would fix all of this once and for all. Ad-hoc dev builds are why you keep hitting it.
 
 ## Privacy: what is stored locally
 

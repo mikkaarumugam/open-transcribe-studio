@@ -269,6 +269,44 @@ def test_native_launcher_owns_fn_event_tap_so_trust_attaches_to_bundle():
     assert "start_fn_event_tap();" in source
 
 
+def test_native_launcher_offers_one_click_permission_reset():
+    # End-user goal: after rebuilding the .app (which gives the binary a
+    # new code signature and silently invalidates all prior TCC grants),
+    # the user can click WT → "Reset Permissions…" to wipe the stale
+    # grants AND open all three System Settings panes in one step,
+    # instead of remembering three separate tccutil reset commands.
+    source = render_native_launcher_source(
+        repo_dir=Path("/Users/mikka/open-transcribe-studio"),
+        model="base",
+        hold_key="fn",
+        language="en",
+    )
+
+    # Third permission shortcut (Microphone joins Accessibility +
+    # Input Monitoring as menu shortcuts).
+    assert "openMicrophoneSettings:" in source
+    assert "Open Microphone Settings" in source
+    assert "Privacy_Microphone" in source
+
+    # Reset action wiring + confirmation dialog.
+    assert "resetPermissions:" in source
+    assert "Reset Permissions" in source
+    assert "Reset WhisperType permissions?" in source
+
+    # Shells out to tccutil for all three buckets. Using the absolute
+    # path so PATH munging in the bundle cannot misdirect to a stub.
+    assert "/usr/bin/tccutil" in source
+    assert '"Microphone"' in source
+    assert '"ListenEvent"' in source
+    assert '"Accessibility"' in source
+
+    # After the reset, all three Settings panes are opened so the user
+    # can re-grant without hunting through System Settings.
+    assert "[self openMicrophoneSettings:nil]" in source
+    assert "[self openInputMonitoringSettings:nil]" in source
+    assert "[self openAccessibilitySettings:nil]" in source
+
+
 def test_native_launcher_source_has_valid_c_string_escapes():
     source = render_native_launcher_source(
         repo_dir=Path("/Users/mikka/open-transcribe-studio"),
