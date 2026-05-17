@@ -292,6 +292,7 @@ static void start_fn_event_tap(void) {{
 - (void)setHotkey:(id)sender;
 - (void)refreshHotkeyMenuLabel;
 - (void)openAccessibilitySettings:(id)sender;
+- (void)openInputMonitoringSettings:(id)sender;
 @end
 
 @implementation WhisperTypeAppDelegate
@@ -299,6 +300,12 @@ static void start_fn_event_tap(void) {{
 - (void)openAccessibilitySettings:(id)sender {{
     (void)sender;
     NSURL *url = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"];
+    [[NSWorkspace sharedWorkspace] openURL:url];
+}}
+
+- (void)openInputMonitoringSettings:(id)sender {{
+    (void)sender;
+    NSURL *url = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"];
     [[NSWorkspace sharedWorkspace] openURL:url];
 }}
 
@@ -550,6 +557,9 @@ int main(int argc, char **argv) {{
         NSMenuItem *settingsItem = [[NSMenuItem alloc] initWithTitle:@"Open Accessibility Settings" action:@selector(openAccessibilitySettings:) keyEquivalent:@""];
         [settingsItem setTarget:delegate];
         [menu addItem:settingsItem];
+        NSMenuItem *inputMonItem = [[NSMenuItem alloc] initWithTitle:@"Open Input Monitoring Settings" action:@selector(openInputMonitoringSettings:) keyEquivalent:@""];
+        [inputMonItem setTarget:delegate];
+        [menu addItem:inputMonItem];
         [menu addItem:[NSMenuItem separatorItem]];
         NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit WhisperType" action:@selector(quitWhisperType:) keyEquivalent:@"q"];
         [quitItem setTarget:delegate];
