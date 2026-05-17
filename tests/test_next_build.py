@@ -74,7 +74,9 @@ def test_native_launcher_execs_repo_python_without_applescript_wrapper():
         language="en",
     )
 
-    assert 'const char *repo = "/Users/mikka/open-transcribe-studio";' in source
+    # The repo path used to live in main() as a local; it's now a file-scope
+    # static (kRepoDir) so pickModel: can restart the worker after a swap.
+    assert 'static const char *kRepoDir = "/Users/mikka/open-transcribe-studio";' in source
     assert 'execl(' in source
     assert '".venv/bin/python"' in source
     assert '"app.mac_dictation.cli"' in source
@@ -167,7 +169,17 @@ def test_native_launcher_supports_configurable_whisper_model_via_menu():
     assert "pickModel:" in source
     assert "Model: %s" in source
     assert "refreshModelMenuLabel" in source
-    assert "Model will change after restart" in source
+    # Picking a model now auto-restarts the Python worker so the menu and
+    # the actually-loaded model can never disagree. The user does not have
+    # to quit and reopen the app to apply the change.
+    assert "restart_python_worker" in source
+    assert "Switching to %s" in source
+    assert "Model will change after restart" not in source
+
+    # Restart implementation details: SIGTERM with bounded wait, SIGKILL
+    # fallback so a wedged worker can't block the swap forever.
+    assert "kill(child_pid, SIGTERM)" in source
+    assert "SIGKILL" in source
 
 
 def test_native_launcher_shows_per_model_downloaded_state_in_submenu():
@@ -241,8 +253,8 @@ def test_native_launcher_source_has_valid_c_string_escapes():
     )
 
     assert 'printf("--- WhisperType native launch ---\\n");' in source
-    assert 'fprintf(stderr, "repo path does not exist or cannot be opened: %s: %s\\n", repo, strerror(errno));' in source
-    assert 'printf("repo: %s\\n", repo);' in source
+    assert 'fprintf(stderr, "repo path does not exist or cannot be opened: %s: %s\\n", kRepoDir, strerror(errno));' in source
+    assert 'printf("repo: %s\\n", kRepoDir);' in source
     assert 'fprintf(stderr, "missing executable .venv/bin/python in %s\\n", repo);' in source
     assert 'fprintf(stderr, "failed to exec %s: %s\\n", python, strerror(errno));' in source
 

@@ -48,14 +48,15 @@ If macOS does not prompt automatically, open **System Settings → Privacy & Sec
 
 **Running from Terminal.** Grant the same permissions to whichever terminal you use (Terminal, iTerm, the Cursor or VS Code terminal, etc.).
 
-**Heads-up: rebuilding the `.app` resets grants.** macOS ties permission grants to the binary's code signature, not the bundle ID. Every time you run `whispertype-build-app`, the signature changes and your previous grants stop applying, even though the app name and bundle ID are identical. To recover:
+**Heads-up: rebuilding the `.app` resets grants.** macOS ties permission grants to the binary's code signature, not the bundle ID. Every time you run `whispertype-build-app`, the signature changes and your previous grants stop applying, even though the app name and bundle ID are identical. To recover, reset all three TCC buckets and then reopen + re-grant in System Settings:
 
 ```bash
+tccutil reset Microphone com.mikka.open-transcribe-studio.whispertype
 tccutil reset ListenEvent com.mikka.open-transcribe-studio.whispertype
 tccutil reset Accessibility com.mikka.open-transcribe-studio.whispertype
 ```
 
-Then reopen `dist/WhisperType.app` and re-enable WhisperType in both panes. A proper signing identity would fix this. Ad-hoc dev builds are why you keep hitting it.
+Then reopen `dist/WhisperType.app` and re-enable WhisperType in all three panes (Microphone, Input Monitoring, Accessibility). Common symptom of forgetting Microphone: `WT ●` lights up when you hold the hotkey but no orange mic indicator appears in the macOS menu bar, and nothing gets transcribed. A proper signing identity would fix this. Ad-hoc dev builds are why you keep hitting it.
 
 ## Privacy: what is stored locally
 
@@ -95,7 +96,7 @@ Click `WT` → *Model* and you will see one of three labels for each model:
 - **`medium — Download (1.5 GB)`** — not on disk yet. Click to start a background download. You can keep dictating with your current model while it runs.
 - **`medium — Downloading…`** — a download is in flight. Open this menu again in a minute or two; when the model is ready, the label flips to plain `medium` with no suffix.
 
-When you click a downloaded model, WhisperType saves your choice to `~/.config/whispertype/model.txt` and shows an alert telling you to quit and reopen the app for the new model to take effect.
+When you click a downloaded model, WhisperType saves your choice to `~/.config/whispertype/model.txt` and **restarts the transcription worker in place** so the new model takes effect right away. The launcher itself stays alive (menu bar, hotkey, status indicator all keep working). Give it a few seconds before your first dictation, especially for the bigger models: `medium` and `large-v3` need 10–20 seconds to load into RAM the first time.
 
 Downloaded models are cached under `~/.cache/huggingface/hub/models--Systran--faster-whisper-{name}/`. This is a one-time cost per model.
 

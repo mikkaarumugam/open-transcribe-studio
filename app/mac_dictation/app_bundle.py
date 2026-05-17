@@ -98,6 +98,10 @@ static NSMenuItem *modelDisplayItem = nil;
 // always reflects what is currently on disk (and what is in the middle of
 // downloading) without us having to poll.
 static NSMenu *modelSubmenu = nil;
+// Repo path baked into the bundle at build time. Stored at file scope so
+// pickModel: can re-fork the Python worker (which lives in the repo's
+// .venv) after the user picks a new model.
+static const char *kRepoDir = "{repo}";
 
 // Configurable Whisper model loaded from ~/.config/whispertype/model.txt.
 // Falls back to the build-time default baked in below if the file is missing
@@ -482,6 +486,11 @@ static void start_fn_event_tap(void) {{
     printf("[WhisperType] launcher CGEventTap installed (bundle owns hotkey trust)\\n");
 }}
 
+// Forward declaration: pickModel: (defined below) needs to call this
+// to swap the Python worker after a model change, but the definition
+// lives further down beside start_python_worker.
+static int restart_python_worker(void);
+
 @interface WhisperTypeAppDelegate : NSObject <NSApplicationDelegate, NSMenuDelegate>
 {{
     NSWindow *captureWindow;
@@ -554,16 +563,31 @@ static void start_fn_event_tap(void) {{
         printf("[WhisperType] ignored unknown model from menu: %s\\n", cChosen);
         return;
     }}
+    if (strcmp(cChosen, current_model) == 0) {{
+        // Already on this model; no point restarting the worker.
+        return;
+    }}
     save_model_to_disk(cChosen);
     strncpy(current_model, cChosen, sizeof(current_model) - 1);
     current_model[sizeof(current_model) - 1] = '\\0';
     [self refreshModelMenuLabel];
 
+    // Auto-restart the Python worker so the new model takes effect right
+    // away. Without this, the menu would lie: it would claim the chosen
+    // model is active when the worker still has the old model in RAM.
+    int rc = restart_python_worker();
+    if (rc != 0) {{
+        NSAlert *fail = [[NSAlert alloc] init];
+        [fail setMessageText:@"Could not switch model"];
+        [fail setInformativeText:@"WhisperType saved your choice but could not restart the dictation worker. Quit and reopen WhisperType from the menu bar to apply the change. See ~/Library/Logs/WhisperType/launcher.log for details."];
+        [fail addButtonWithTitle:@"OK"];
+        [fail runModal];
+        return;
+    }}
+
     NSAlert *alert = [[NSAlert alloc] init];
-    [alert setMessageText:@"Model will change after restart"];
-    [alert setInformativeText:[NSString stringWithFormat:
-        @"WhisperType will use the %s model the next time you open it.\\n\\nQuit WhisperType from the menu bar and reopen it to apply the change.",
-        cChosen]];
+    [alert setMessageText:[NSString stringWithFormat:@"Switching to %s", cChosen]];
+    [alert setInformativeText:@"WhisperType is restarting its transcription worker with the new model. Wait a few seconds for the model to load before your first dictation (longer models like medium or large-v3 can take 10–20 seconds to load into RAM the first time)."];
     [alert addButtonWithTitle:@"OK"];
     [alert runModal];
 }}
@@ -849,17 +873,52 @@ static int start_python_worker(const char *repo) {{
     return 0;
 }}
 
+// Kill the current Python worker, reap it, then fork a fresh one. Used after
+// the user picks a new model so the change takes effect immediately without
+// the user having to quit and reopen WhisperType. The launcher itself stays
+// alive — only the child Python process holding the Whisper model in RAM
+// gets restarted.
+static int restart_python_worker(void) {{
+    if (child_pid > 0) {{
+        printf("[WhisperType] restarting Python worker (was pid %d)\\n", child_pid);
+        kill(child_pid, SIGTERM);
+        int status = 0;
+        bool reaped = false;
+        // Give the child up to ~3 seconds to exit gracefully.
+        for (int i = 0; i < 30; i++) {{
+            pid_t result = waitpid(child_pid, &status, WNOHANG);
+            if (result == child_pid) {{ reaped = true; break; }}
+            if (result < 0 && errno == ECHILD) {{ reaped = true; break; }}
+            usleep(100000);  // 100ms
+        }}
+        if (!reaped) {{
+            printf("[WhisperType] worker did not exit on SIGTERM, sending SIGKILL\\n");
+            kill(child_pid, SIGKILL);
+            waitpid(child_pid, &status, 0);
+        }}
+        child_pid = -1;
+    }}
+    if (fn_pipe_write_fd >= 0) {{
+        close(fn_pipe_write_fd);
+        fn_pipe_write_fd = -1;
+    }}
+    // The old worker is gone, so any in-flight FN_DOWN had no consumer.
+    // Clear our local state so the new worker doesn't start out thinking
+    // the hotkey is held.
+    hotkey_is_down = false;
+    return start_python_worker(kRepoDir);
+}}
+
 int main(int argc, char **argv) {{
     (void)argc;
     (void)argv;
     open_log();
     printf("--- WhisperType native launch ---\\n");
-    const char *repo = "{repo}";
-    if (chdir(repo) != 0) {{
-        fprintf(stderr, "repo path does not exist or cannot be opened: %s: %s\\n", repo, strerror(errno));
+    if (chdir(kRepoDir) != 0) {{
+        fprintf(stderr, "repo path does not exist or cannot be opened: %s: %s\\n", kRepoDir, strerror(errno));
         return 1;
     }}
-    printf("repo: %s\\n", repo);
+    printf("repo: %s\\n", kRepoDir);
 
     @autoreleasepool {{
         NSApplication *app = [NSApplication sharedApplication];
@@ -909,7 +968,7 @@ int main(int argc, char **argv) {{
         [statusItem setMenu:menu];
         printf("[WhisperType] native menu bar item ready: WT\\n");
 
-        if (start_python_worker(repo) != 0) {{
+        if (start_python_worker(kRepoDir) != 0) {{
             return 1;
         }}
         start_fn_event_tap();
