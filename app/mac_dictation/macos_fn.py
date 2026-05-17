@@ -12,6 +12,7 @@ from app.mac_dictation.controller import DictationController
 # constant here lets us unit-test the state machine on Linux too.
 FN_FLAG_MASK = 1 << 23
 FN_KEYCODE = 63
+FN_FALLBACK_KEYCODES = {63, 179}
 
 
 @dataclass
@@ -22,17 +23,7 @@ class MacFnStateTracker:
     is_fn_down: bool = False
     on_state_change: Callable[[str], None] | None = None
 
-    def handle_flags(self, flags: int) -> None:
-        self.handle_event(flags=flags, keycode=None)
-
-    def handle_event(self, flags: int, keycode: int | None = None) -> None:
-        fn_down_now = bool(int(flags) & FN_FLAG_MASK)
-        if keycode == FN_KEYCODE and not fn_down_now:
-            # Some Mac keyboards expose Globe/Fn as a flagsChanged event with
-            # keycode 63 but without kCGEventFlagMaskSecondaryFn. In that case
-            # the press and release arrive as two keycode-63 events, so toggle
-            # state rather than waiting for a flag bit that never appears.
-            fn_down_now = not self.is_fn_down
+    def _set_fn_down(self, fn_down_now: bool) -> None:
         if fn_down_now and not self.is_fn_down:
             self.is_fn_down = True
             if self.on_state_change is not None:
@@ -47,6 +38,27 @@ class MacFnStateTracker:
                 name="WhisperTypeTranscription",
                 daemon=True,
             ).start()
+
+    def handle_flags(self, flags: int) -> None:
+        self.handle_event(flags=flags, keycode=None)
+
+    def handle_event(self, flags: int, keycode: int | None = None) -> None:
+        fn_down_now = bool(int(flags) & FN_FLAG_MASK)
+        if keycode in FN_FALLBACK_KEYCODES and not fn_down_now:
+            # Some Mac keyboards expose Globe/Fn as a flagsChanged event with
+            # a raw keycode but without kCGEventFlagMaskSecondaryFn. In that
+            # case the press and release arrive as two fallback-key events, so
+            # toggle state rather than waiting for a flag bit that never appears.
+            fn_down_now = not self.is_fn_down
+        self._set_fn_down(fn_down_now)
+
+    def handle_key_down(self, keycode: int) -> None:
+        if keycode in FN_FALLBACK_KEYCODES:
+            self._set_fn_down(True)
+
+    def handle_key_up(self, keycode: int) -> None:
+        if keycode in FN_FALLBACK_KEYCODES:
+            self._set_fn_down(False)
 
 
 class MacFnEventTapListener:
@@ -66,21 +78,31 @@ class MacFnEventTapListener:
     def _callback(self, proxy, event_type, event, refcon):  # pragma: no cover - macOS integration
         import Quartz
 
-        if event_type == Quartz.kCGEventFlagsChanged:
-            flags = Quartz.CGEventGetFlags(event)
-            keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
-            try:
+        try:
+            if event_type == Quartz.kCGEventFlagsChanged:
+                flags = Quartz.CGEventGetFlags(event)
+                keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
                 self.tracker.handle_event(flags=flags, keycode=keycode)
-            except Exception:
-                print("[WhisperType] fn event handler crashed", flush=True)
-                traceback.print_exc()
+            elif event_type == Quartz.kCGEventKeyDown:
+                keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
+                self.tracker.handle_key_down(keycode)
+            elif event_type == Quartz.kCGEventKeyUp:
+                keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
+                self.tracker.handle_key_up(keycode)
+        except Exception:
+            print("[WhisperType] fn event handler crashed", flush=True)
+            traceback.print_exc()
         return event
 
     def run_forever(self) -> None:  # pragma: no cover - macOS integration
         import Quartz
 
         print("[WhisperType] starting native macOS fn event tap", flush=True)
-        event_mask = Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
+        event_mask = (
+            Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
+            | Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)
+            | Quartz.CGEventMaskBit(Quartz.kCGEventKeyUp)
+        )
         tap = Quartz.CGEventTapCreate(
             Quartz.kCGSessionEventTap,
             Quartz.kCGHeadInsertEventTap,

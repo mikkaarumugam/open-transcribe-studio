@@ -58,3 +58,15 @@ def test_fn_tracker_toggles_for_fn_keycode_when_secondary_fn_flag_is_missing():
 
     assert controller.events == ["down", "up"]
     assert state_changes == ["down", "up"]
+
+
+def test_fn_tracker_accepts_raw_179_key_down_up_fallback():
+    controller = FakeController()
+    state_changes = []
+    tracker = MacFnStateTracker(controller, on_state_change=state_changes.append)
+
+    tracker.handle_key_down(179)
+    tracker.handle_key_up(179)
+
+    assert controller.events == ["down", "up"]
+    assert state_changes == ["down", "up"]
