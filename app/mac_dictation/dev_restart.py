@@ -42,8 +42,10 @@ def main() -> None:
 
     run(["osascript", "-e", 'quit app "WhisperType"'], cwd=repo_dir, check=False)
     run(["killall", "WhisperType"], cwd=repo_dir, check=False)
-    run(["killall", "Python3"], cwd=repo_dir, check=False)
-    run(["killall", "Python"], cwd=repo_dir, check=False)
+    # Do not run `killall Python`/`killall Python3` here: this command is itself
+    # a Python process, so macOS can terminate the restart helper before it gets
+    # to rebuild/open the app. Only kill stale WhisperType worker processes.
+    run(["pkill", "-f", "python.*-m app.mac_dictation.cli"], cwd=repo_dir, check=False)
 
     app_path = repo_dir / "dist" / "WhisperType.app"
     if app_path.exists():
