@@ -570,13 +570,17 @@ static int restart_python_worker(void);
         printf("[WhisperType] tccutil reset %s -> exit %d\\n", buckets[i], WEXITSTATUS(status));
     }}
 
-    [self openMicrophoneSettings:nil];
-    [self openInputMonitoringSettings:nil];
+    // macOS System Settings is a single-window app — opening three
+    // x-apple.systempreferences:... URLs in a row just navigates the
+    // same window three times, so the user only sees the LAST one. We
+    // open Accessibility because it's the trickiest (and the one most
+    // likely to need the minus-button workaround), then tell the user
+    // to use the WT menu shortcuts to visit the other two.
     [self openAccessibilitySettings:nil];
 
     NSAlert *next = [[NSAlert alloc] init];
-    [next setMessageText:@"Permissions reset"];
-    [next setInformativeText:@"Now toggle WhisperType ON in all three Settings panes: Microphone, Input Monitoring, and Accessibility.\\n\\nIf the Accessibility row still does not work after toggling, click WhisperType in the list and press the minus (–) button to remove it, then drag the .app back in.\\n\\nWhen you are done, quit WhisperType from the menu bar and reopen it from /Applications."];
+    [next setMessageText:@"Permissions reset — now re-grant"];
+    [next setInformativeText:@"System Settings is open at Accessibility (the one most likely to fight you).\\n\\n1. Toggle WhisperType ON in Accessibility.\\n   • If it stays broken (paste does nothing after dictating), click WhisperType in the list, press the minus (–) button to remove it, then drag /Applications/WhisperType.app back into the list.\\n\\n2. Click WT in the menu bar → Open Microphone Settings → toggle WhisperType ON.\\n\\n3. Click WT in the menu bar → Open Input Monitoring Settings → toggle WhisperType ON.\\n\\n4. Click WT → Quit WhisperType, then reopen from /Applications. The new grants only take effect on next launch."];
     [next addButtonWithTitle:@"OK"];
     [next runModal];
 }}

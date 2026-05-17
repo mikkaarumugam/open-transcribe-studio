@@ -42,17 +42,26 @@ WhisperType needs three macOS permissions:
 - **Accessibility**, to send Cmd+V into the active app.
 - **Input Monitoring**, to detect the global hotkey.
 
-If macOS does not prompt automatically, open **System Settings → Privacy & Security**. The `WT` menu also has direct shortcuts: *Open Accessibility Settings* and *Open Input Monitoring Settings*.
+If macOS does not prompt automatically, open **System Settings → Privacy & Security**. The `WT` menu has direct shortcuts to all three panes: *Open Microphone Settings*, *Open Accessibility Settings*, *Open Input Monitoring Settings*.
 
-**Running from `dist/WhisperType.app` (recommended).** The bundle's native launcher owns the hotkey listener, so you only need to enable **WhisperType** in Accessibility and Input Monitoring. There is no separate "Python 3" row to worry about.
+**Running from `/Applications/WhisperType.app` (recommended).** The bundle's native launcher owns the hotkey listener, so you only need to enable **WhisperType** in all three panes. There is no separate "Python 3" row to worry about.
 
 **Running from Terminal.** Grant the same permissions to whichever terminal you use (Terminal, iTerm, the Cursor or VS Code terminal, etc.).
 
-**Heads-up: rebuilding the `.app` resets grants.** macOS ties permission grants to the binary's code signature, not the bundle ID. Every time you run `whispertype-build-app`, the signature changes and your previous grants stop applying, even though the app name and bundle ID are identical.
+### The rebuild ritual
 
-**The one-click fix is built into the app itself.** Click `WT` → **Reset Permissions…**. It wipes the TCC records for all three buckets, opens all three System Settings panes, and tells you what to do. Toggle WhisperType on in each pane, then quit and reopen from `/Applications`.
+macOS ties permission grants to the binary's code signature, not the bundle ID. Every time you run `whispertype-build-app`, the signature changes and your previous grants stop applying, even though the app name and bundle ID are identical. You will hit this every single rebuild until you set up code signing.
 
-If you prefer the manual route (or the menu item is unavailable because the binary itself won't launch), the equivalent terminal commands are:
+**The one-click fix lives in the menu.** Click `WT` → **Reset Permissions…**. It wipes the TCC records for all three buckets, opens the Accessibility pane (the trickiest one), and walks you through re-granting.
+
+Steps after clicking Reset Permissions:
+
+1. In the Accessibility pane that just opened, toggle WhisperType **on**. *If toggling does not work (see "Dictation doesn't paste" below), use the minus button and re-add.*
+2. Click `WT` → **Open Microphone Settings** → toggle WhisperType on.
+3. Click `WT` → **Open Input Monitoring Settings** → toggle WhisperType on.
+4. Click `WT` → **Quit WhisperType**, then reopen from `/Applications`. **New grants only take effect on next launch.**
+
+If for some reason the menu item is unavailable (e.g. the binary won't launch), the equivalent terminal commands are:
 
 ```bash
 tccutil reset Microphone com.mikka.open-transcribe-studio.whispertype
@@ -60,12 +69,23 @@ tccutil reset ListenEvent com.mikka.open-transcribe-studio.whispertype
 tccutil reset Accessibility com.mikka.open-transcribe-studio.whispertype
 ```
 
-Common symptoms of forgetting a permission:
-- **No Microphone**: `WT ●` lights up when you hold the hotkey but no orange mic indicator appears in the macOS menu bar, and nothing gets transcribed.
-- **No Accessibility**: dictation transcribes (you can see it in the log), but nothing pastes into the active app. Manual Cmd+V works; auto Cmd+V from WhisperType is silently blocked.
-- **No Input Monitoring**: pressing fn does nothing at all. Log shows no `fn down` events.
+### Troubleshooting by symptom
 
-If Accessibility stays stuck even after the reset (rare macOS quirk where the stale entry in the list won't rebind), click WhisperType in the Accessibility list and press the minus (–) button to remove it entirely, then drag the `.app` back in or wait for macOS to re-prompt on next dictation attempt.
+**Pressing the hotkey does nothing. The `WT` icon never changes.**
+Input Monitoring is denied. Click `WT` → Open Input Monitoring Settings, toggle WhisperType on, quit + reopen.
+
+**`WT ●` lights up while you hold the hotkey, but no orange mic dot appears in the macOS menu bar, and nothing transcribes.**
+Microphone is denied. Click `WT` → Open Microphone Settings, toggle WhisperType on, quit + reopen.
+
+**Dictation transcribes (you see WT…) but nothing pastes into your text field. Manual Cmd+V works fine.**
+This is the most common one and almost always Accessibility. Try in order:
+
+1. Click `WT` → Open Accessibility Settings. Confirm WhisperType is toggled **on**. Quit + reopen WhisperType.
+2. If that doesn't fix it: in Accessibility, click the WhisperType row, press the **minus (–) button** at the bottom of the list to remove it entirely. Then drag `/Applications/WhisperType.app` back into the list (or wait for macOS to re-prompt on your next dictation attempt). The toggle was bound to a stale code signature from a previous build; removing forces a clean re-bind to the current binary.
+3. If still broken: click `WT` → Reset Permissions… and start fresh.
+
+**Everything was working yesterday and now it isn't.**
+You rebuilt the `.app` since. Click `WT` → Reset Permissions… and follow the steps above.
 
 A proper signing identity would fix all of this once and for all. Ad-hoc dev builds are why you keep hitting it.
 

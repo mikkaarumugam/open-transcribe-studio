@@ -300,11 +300,28 @@ def test_native_launcher_offers_one_click_permission_reset():
     assert '"ListenEvent"' in source
     assert '"Accessibility"' in source
 
-    # After the reset, all three Settings panes are opened so the user
-    # can re-grant without hunting through System Settings.
-    assert "[self openMicrophoneSettings:nil]" in source
-    assert "[self openInputMonitoringSettings:nil]" in source
-    assert "[self openAccessibilitySettings:nil]" in source
+    # After the reset, we open ONLY the Accessibility pane. macOS System
+    # Settings is a single-window app, so opening three URLs in a row
+    # just navigates the same window through them and the user only ever
+    # sees the last. The follow-up alert walks them to Microphone and
+    # Input Monitoring via the WT menu shortcuts (which they have to
+    # click one at a time so each navigation registers).
+    # Match the implementation, not the @interface forward declaration.
+    rp_start = source.index("- (void)resetPermissions:(id)sender {")
+    rp_end = source.index("- (void)", rp_start + 1)
+    rp_body = source[rp_start:rp_end]
+    assert "[self openAccessibilitySettings:nil]" in rp_body
+    assert "[self openMicrophoneSettings:nil]" not in rp_body
+    assert "[self openInputMonitoringSettings:nil]" not in rp_body
+
+    # Alert must tell the user how to reach the other two panes,
+    # otherwise they'll think the reset only handled Accessibility.
+    assert "Open Microphone Settings" in source
+    assert "Open Input Monitoring Settings" in source
+    # And it must include the minus-button workaround for stuck
+    # Accessibility entries — this is the specific failure mode the
+    # user (and anyone evaluating the portfolio) hits most often.
+    assert "minus" in source.lower() or "(–)" in source
 
 
 def test_native_launcher_source_has_valid_c_string_escapes():
