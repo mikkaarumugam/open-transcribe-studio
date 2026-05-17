@@ -66,13 +66,15 @@ WhisperType is local-first. Nothing is uploaded anywhere. But two things do get 
 
 WhisperType uses [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper), which ships several model sizes. Bigger models are more accurate but slower and bigger on disk. For hotkey-style dictation (short clips, mostly clear English), **`base` is the sweet spot** and it is the default.
 
-| Model | Disk | Speed on a Mac | Accuracy | When to pick it |
+| Model | Disk | Transcribe time (≈5 sec clip, typical M1/M2 Mac) | Accuracy | When to pick it |
 |---|---|---|---|---|
-| `tiny` | ~75 MB | fastest | weakest | Smoke-testing setup only. Will mishear short or accented speech. |
-| **`base`** | ~150 MB | fast | decent | **Default.** Good for clear English dictation on a typical Mac. |
-| `small` | ~480 MB | slower | noticeably better | Bump to this if `base` keeps mishearing your accent, common words, or background noise. |
-| `medium` | ~1.5 GB | slow | strong | Overkill for short dictation. Useful if your audio is long or hard. |
-| `large-v3` | ~3 GB | slowest | best | Way overkill for hotkey dictation. Adds seconds of delay per phrase. |
+| `tiny` | ~75 MB | ~0.5 sec | weakest | Smoke-testing setup only. Will mishear short or accented speech. |
+| **`base`** | ~150 MB | ~1 sec | decent | **Default.** Good for clear English dictation on a typical Mac. Feels instant. |
+| `small` | ~480 MB | ~3 sec | noticeably better | Bump to this if `base` keeps mishearing your accent, common words, or background noise. Noticeable wait but usable. |
+| `medium` | ~1.5 GB | ~8 sec | strong | Overkill for short dictation. The wait feels broken even though it is working. |
+| `large-v3` | ~3 GB | ~15+ sec | best | Way overkill for hotkey dictation. You will think it is frozen. It is not, it is just slow. |
+
+For hotkey dictation, the useful range is realistically **`base` or `small`**. Past that, the wait kills the whole point of the hotkey. `medium` and `large-v3` are included for completeness and for cases where you do not mind waiting (e.g. you released fn and are happy to wait for a more accurate transcription of a longer clip).
 
 ### Change the model from the menu bar
 
