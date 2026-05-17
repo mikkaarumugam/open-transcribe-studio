@@ -15,6 +15,26 @@ FN_KEYCODE = 63
 FN_FALLBACK_KEYCODES = {63, 179}
 
 
+def parse_fn_fallback_keycodes(hold_key: str = "fn") -> set[int]:
+    """Return raw keycodes that should be treated as fn/Globe.
+
+    `scripts/detect_keys.py` prints raw keys as strings like `<179>`. Passing
+    `--hold-key '<179>'` should still use the native Quartz listener, not the
+    generic pynput listener that requires a different accessibility trust path.
+    """
+    key = hold_key.strip().lower()
+    fallback_keycodes = set(FN_FALLBACK_KEYCODES)
+    if key in {"fn", "globe"}:
+        return fallback_keycodes
+    if key.startswith("<") and key.endswith(">"):
+        key = key[1:-1]
+    try:
+        fallback_keycodes.add(int(key))
+    except ValueError:
+        pass
+    return fallback_keycodes
+
+
 @dataclass
 class MacFnStateTracker:
     """Convert macOS modifier-flag changes into hold-to-record events."""
@@ -22,6 +42,11 @@ class MacFnStateTracker:
     controller: DictationController
     is_fn_down: bool = False
     on_state_change: Callable[[str], None] | None = None
+    fallback_keycodes: set[int] | None = None
+
+    def __post_init__(self) -> None:
+        if self.fallback_keycodes is None:
+            self.fallback_keycodes = set(FN_FALLBACK_KEYCODES)
 
     def _set_fn_down(self, fn_down_now: bool) -> None:
         if fn_down_now and not self.is_fn_down:
@@ -44,7 +69,7 @@ class MacFnStateTracker:
 
     def handle_event(self, flags: int, keycode: int | None = None) -> None:
         fn_down_now = bool(int(flags) & FN_FLAG_MASK)
-        if keycode in FN_FALLBACK_KEYCODES and not fn_down_now:
+        if keycode in self.fallback_keycodes and not fn_down_now:
             # Some Mac keyboards expose Globe/Fn as a flagsChanged event with
             # a raw keycode but without kCGEventFlagMaskSecondaryFn. In that
             # case the press and release arrive as two fallback-key events, so
@@ -53,11 +78,11 @@ class MacFnStateTracker:
         self._set_fn_down(fn_down_now)
 
     def handle_key_down(self, keycode: int) -> None:
-        if keycode in FN_FALLBACK_KEYCODES:
+        if keycode in self.fallback_keycodes:
             self._set_fn_down(True)
 
     def handle_key_up(self, keycode: int) -> None:
-        if keycode in FN_FALLBACK_KEYCODES:
+        if keycode in self.fallback_keycodes:
             self._set_fn_down(False)
 
 
@@ -69,10 +94,16 @@ class MacFnEventTapListener:
     listener can detect both hold and release.
     """
 
-    def __init__(self, controller: DictationController):
+    def __init__(self, controller: DictationController, hold_key: str = "fn"):
+        fallback_keycodes = parse_fn_fallback_keycodes(hold_key)
         self.tracker = MacFnStateTracker(
             controller,
             on_state_change=lambda state: print(f"[WhisperType] fn {state}", flush=True),
+            fallback_keycodes=fallback_keycodes,
+        )
+        print(
+            f"[WhisperType] native fn fallback keycodes: {sorted(fallback_keycodes)}",
+            flush=True,
         )
 
     def _callback(self, proxy, event_type, event, refcon):  # pragma: no cover - macOS integration

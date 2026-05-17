@@ -28,10 +28,13 @@ def create_controller(
 
 def create_listener_runner(controller: DictationController, hold_key: str) -> Callable[[], None]:
     is_macos = platform.system() == "Darwin"
-    if is_macos and hold_key.lower() == "fn":
+    hold_key_normalized = hold_key.strip().lower()
+    if is_macos and (
+        hold_key_normalized in {"fn", "globe", "63", "<63>", "179", "<179>"}
+    ):
         from app.mac_dictation.macos_fn import MacFnEventTapListener
 
-        return MacFnEventTapListener(controller=controller).run_forever
+        return MacFnEventTapListener(controller=controller, hold_key=hold_key).run_forever
     return HoldKeyListener(controller=controller, hold_key=hold_key).run_forever
 
 

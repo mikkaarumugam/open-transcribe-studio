@@ -1,4 +1,9 @@
-from app.mac_dictation.macos_fn import FN_FLAG_MASK, FN_KEYCODE, MacFnStateTracker
+from app.mac_dictation.macos_fn import (
+    FN_FLAG_MASK,
+    FN_KEYCODE,
+    MacFnStateTracker,
+    parse_fn_fallback_keycodes,
+)
 
 
 class FakeController:
@@ -70,3 +75,9 @@ def test_fn_tracker_accepts_raw_179_key_down_up_fallback():
 
     assert controller.events == ["down", "up"]
     assert state_changes == ["down", "up"]
+
+
+def test_parse_fn_fallback_keycodes_accepts_detect_keys_output_format():
+    assert 179 in parse_fn_fallback_keycodes("<179>")
+    assert 179 in parse_fn_fallback_keycodes("179")
+    assert {63, 179}.issubset(parse_fn_fallback_keycodes("fn"))
