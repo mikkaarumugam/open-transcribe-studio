@@ -117,6 +117,12 @@ whispertype --model tiny --hold-key f18
 
 Or try another key name that your keyboard listener can see.
 
+On Mikka's current Mac, `fn` / Globe has been seen as raw `<179>`, so this is the fastest fallback to try:
+
+```bash
+whispertype --model tiny --hold-key '<179>'
+```
+
 ## Run as a menu bar app without Terminal
 
 Once the normal `whispertype --model tiny` command works in Terminal, build the local app launcher:
@@ -128,7 +134,7 @@ whispertype-build-app --repo-dir "$PWD" --model tiny --language en
 open dist/WhisperType.app
 ```
 
-If double-clicking does not show `WT`, rebuild the app after pulling updates. The builder uses macOS `osacompile` on your Mac to create a proper double-clickable AppleScript app wrapper, instead of relying on Finder/LaunchServices to run a raw shell script directly.
+If double-clicking does not show `WT`, rebuild the app after pulling updates. The builder creates a tiny native macOS launcher that owns the `WT` menu-bar item and starts the Python dictation worker in the background.
 
 ```bash
 cd open-transcribe-studio
@@ -160,6 +166,14 @@ When `fn` detection is healthy, the log should include:
 ```
 
 If `WT` appears but pressing `fn` does nothing and the log does not show `fn down`, re-check Input Monitoring and Accessibility for both `WhisperType` and `Python 3`, then quit and reopen the app.
+
+For faster local debugging, use the one-command restart loop instead of repeatedly copying the full rebuild block:
+
+```bash
+whispertype-dev-restart --hold-key '<179>'
+```
+
+It pulls, reinstalls, kills old app/Python workers, rebuilds, opens `WhisperType.app`, and prints the latest launcher log. Use `--no-pull --no-install` when only testing local code changes.
 
 What this does:
 

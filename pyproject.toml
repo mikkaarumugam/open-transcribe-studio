@@ -27,6 +27,7 @@ whispertype = "app.mac_dictation.cli:main"
 whispertype-build-app = "app.mac_dictation.app_bundle:main"
 whispertype-doctor = "app.mac_dictation.doctor:main"
 whispertype-paste-test = "app.mac_dictation.paste_test:main"
+whispertype-dev-restart = "app.mac_dictation.dev_restart:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.2.0", "httpx>=0.27.0"]
