@@ -78,6 +78,7 @@ def render_native_launcher_source(
     language_c = _c_string(language)
     return f'''#import <Cocoa/Cocoa.h>
 #import <CoreGraphics/CoreGraphics.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -93,6 +94,10 @@ static pid_t child_pid = -1;
 static NSStatusItem *statusItem = nil;
 static NSMenuItem *hotkeyDisplayItem = nil;
 static NSMenuItem *modelDisplayItem = nil;
+// The model submenu is rebuilt on every open via NSMenuDelegate so the menu
+// always reflects what is currently on disk (and what is in the middle of
+// downloading) without us having to poll.
+static NSMenu *modelSubmenu = nil;
 
 // Configurable Whisper model loaded from ~/.config/whispertype/model.txt.
 // Falls back to the build-time default baked in below if the file is missing
@@ -293,6 +298,95 @@ static NSString *menu_title_for_status(const char *status) {{
     return @"WT";
 }}
 
+// === Model download state ===
+// A model is "downloaded" when faster-whisper / huggingface_hub has populated
+// the snapshots/ subdir under the model's cache directory. Using snapshots/
+// (and requiring it to be non-empty) avoids reporting a partially-downloaded
+// model as ready \u2014 the parent directory exists before the blobs land.
+static bool model_is_downloaded(const char *name) {{
+    const char *home = getenv("HOME");
+    if (!home) return false;
+    char snapshots[4096];
+    snprintf(snapshots, sizeof(snapshots),
+        "%s/.cache/huggingface/hub/models--Systran--faster-whisper-%s/snapshots",
+        home, name);
+    DIR *d = opendir(snapshots);
+    if (!d) return false;
+    bool has_entry = false;
+    struct dirent *entry;
+    while ((entry = readdir(d)) != NULL) {{
+        if (strcmp(entry->d_name, ".") == 0) continue;
+        if (strcmp(entry->d_name, "..") == 0) continue;
+        has_entry = true;
+        break;
+    }}
+    closedir(d);
+    return has_entry;
+}}
+
+static void download_lock_path(const char *name, char *out, size_t out_len) {{
+    const char *home = getenv("HOME");
+    if (!home) home = "";
+    snprintf(out, out_len, "%s/.config/whispertype/downloading-%s.lock", home, name);
+}}
+
+// True if there is a live `download_model.py` helper currently fetching this
+// model. The helper writes its PID into the lock file on start and removes
+// the lock on exit; we double-check with `kill(pid, 0)` so a stale lock
+// from a crashed helper does not block re-downloading.
+static bool download_in_progress_for(const char *name) {{
+    char path[4096];
+    download_lock_path(name, path, sizeof(path));
+    FILE *f = fopen(path, "r");
+    if (!f) return false;
+    char line[32];
+    if (fgets(line, sizeof(line), f) == NULL) {{
+        fclose(f);
+        return false;
+    }}
+    fclose(f);
+    pid_t pid = (pid_t)strtol(line, NULL, 10);
+    if (pid <= 0) return false;
+    if (kill(pid, 0) == 0) return true;
+    if (errno == EPERM) return true;  // exists but we cannot signal it
+    return false;
+}}
+
+static const char *model_size_label(const char *name) {{
+    if (strcmp(name, "tiny") == 0)     return "75 MB";
+    if (strcmp(name, "base") == 0)     return "150 MB";
+    if (strcmp(name, "small") == 0)    return "480 MB";
+    if (strcmp(name, "medium") == 0)   return "1.5 GB";
+    if (strcmp(name, "large-v3") == 0) return "3.0 GB";
+    return "";
+}}
+
+// Fork+exec the Python download helper. Returns the new pid or -1 on error.
+// The child inherits the launcher's stdout/stderr (already redirected to
+// ~/Library/Logs/WhisperType/launcher.log), and setsid() detaches it from
+// the launcher so quitting WhisperType.app does not kill an in-flight
+// download.
+static int start_model_download(const char *name) {{
+    pid_t pid = fork();
+    if (pid < 0) return -1;
+    if (pid == 0) {{
+        setsid();
+        const char *python = ".venv/bin/python";
+        execl(
+            python,
+            python,
+            "-m",
+            "app.mac_dictation.download_model",
+            "--model",
+            name,
+            (char *)NULL
+        );
+        fprintf(stderr, "failed to exec download helper: %s\\n", strerror(errno));
+        _exit(127);
+    }}
+    return (int)pid;
+}}
+
 static void write_hotkey_event(const char *event) {{
     if (fn_pipe_write_fd < 0) return;
     char buf[16];
@@ -388,7 +482,7 @@ static void start_fn_event_tap(void) {{
     printf("[WhisperType] launcher CGEventTap installed (bundle owns hotkey trust)\\n");
 }}
 
-@interface WhisperTypeAppDelegate : NSObject <NSApplicationDelegate>
+@interface WhisperTypeAppDelegate : NSObject <NSApplicationDelegate, NSMenuDelegate>
 {{
     NSWindow *captureWindow;
     NSTextField *captureLabel;
@@ -399,9 +493,12 @@ static void start_fn_event_tap(void) {{
 - (void)refreshHotkeyMenuLabel;
 - (void)refreshModelMenuLabel;
 - (void)pickModel:(id)sender;
+- (void)downloadModel:(id)sender;
+- (void)rebuildModelSubmenu;
 - (void)openAccessibilitySettings:(id)sender;
 - (void)openInputMonitoringSettings:(id)sender;
 - (void)pollStatusIndicator:(NSTimer *)timer;
+- (void)menuNeedsUpdate:(NSMenu *)menu;
 @end
 
 @implementation WhisperTypeAppDelegate
@@ -450,7 +547,8 @@ static void start_fn_event_tap(void) {{
 
 - (void)pickModel:(id)sender {{
     NSMenuItem *item = (NSMenuItem *)sender;
-    NSString *chosen = [item title];
+    NSString *nameAttr = [item representedObject];
+    NSString *chosen = (nameAttr != nil) ? nameAttr : [item title];
     const char *cChosen = [chosen UTF8String];
     if (!model_is_valid(cChosen)) {{
         printf("[WhisperType] ignored unknown model from menu: %s\\n", cChosen);
@@ -463,12 +561,87 @@ static void start_fn_event_tap(void) {{
 
     NSAlert *alert = [[NSAlert alloc] init];
     [alert setMessageText:@"Model will change after restart"];
-    NSString *info = [NSString stringWithFormat:
-        @"WhisperType will use the %s model the next time you open it.\\n\\nQuit WhisperType from the menu bar and reopen it to apply the change. The first time you use a new model, Whisper will download it (small ≈ 480 MB, medium ≈ 1.5 GB, large-v3 ≈ 3 GB), so give it a moment.",
-        cChosen];
-    [alert setInformativeText:info];
+    [alert setInformativeText:[NSString stringWithFormat:
+        @"WhisperType will use the %s model the next time you open it.\\n\\nQuit WhisperType from the menu bar and reopen it to apply the change.",
+        cChosen]];
     [alert addButtonWithTitle:@"OK"];
     [alert runModal];
+}}
+
+- (void)downloadModel:(id)sender {{
+    NSMenuItem *item = (NSMenuItem *)sender;
+    NSString *nameObj = [item representedObject];
+    if (nameObj == nil) return;
+    const char *name = [nameObj UTF8String];
+    if (!model_is_valid(name)) {{
+        printf("[WhisperType] ignored unknown model from download menu: %s\\n", name);
+        return;
+    }}
+    if (model_is_downloaded(name)) {{
+        printf("[WhisperType] %s already on disk, skipping download\\n", name);
+        return;
+    }}
+    if (download_in_progress_for(name)) {{
+        printf("[WhisperType] download already in progress for %s\\n", name);
+        return;
+    }}
+    int pid = start_model_download(name);
+    if (pid < 0) {{
+        NSAlert *fail = [[NSAlert alloc] init];
+        [fail setMessageText:@"Could not start download"];
+        [fail setInformativeText:@"WhisperType could not launch the download helper. Check ~/Library/Logs/WhisperType/launcher.log for details."];
+        [fail addButtonWithTitle:@"OK"];
+        [fail runModal];
+        return;
+    }}
+    printf("[WhisperType] download started: model=%s pid=%d\\n", name, pid);
+
+    NSAlert *alert = [[NSAlert alloc] init];
+    [alert setMessageText:[NSString stringWithFormat:@"Downloading %s", name]];
+    [alert setInformativeText:[NSString stringWithFormat:
+        @"%s is downloading in the background (about %s). You can keep using WhisperType with your current model.\\n\\nOpen this menu again later to check — the model will show a checkmark when it is ready.",
+        name, model_size_label(name)]];
+    [alert addButtonWithTitle:@"OK"];
+    [alert runModal];
+}}
+
+- (void)rebuildModelSubmenu {{
+    if (modelSubmenu == nil) return;
+    [modelSubmenu removeAllItems];
+    for (int i = 0; i < VALID_MODELS_COUNT; i++) {{
+        const char *name = VALID_MODELS[i];
+        NSString *nsName = [NSString stringWithUTF8String:name];
+        NSMenuItem *item;
+        if (model_is_downloaded(name)) {{
+            item = [[NSMenuItem alloc] initWithTitle:nsName action:@selector(pickModel:) keyEquivalent:@""];
+            [item setTarget:self];
+            [item setRepresentedObject:nsName];
+            if (strcmp(name, current_model) == 0) {{
+                [item setState:NSControlStateValueOn];
+            }}
+        }} else if (download_in_progress_for(name)) {{
+            NSString *title = [NSString stringWithFormat:@"%@ — Downloading…", nsName];
+            item = [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
+            [item setRepresentedObject:nsName];
+            // action:nil + auto-enabling menu = visually disabled
+        }} else {{
+            NSString *title = [NSString stringWithFormat:@"%@ — Download (%s)", nsName, model_size_label(name)];
+            item = [[NSMenuItem alloc] initWithTitle:title action:@selector(downloadModel:) keyEquivalent:@""];
+            [item setTarget:self];
+            [item setRepresentedObject:nsName];
+        }}
+        [modelSubmenu addItem:item];
+    }}
+}}
+
+- (void)menuNeedsUpdate:(NSMenu *)menu {{
+    // Re-stat the HuggingFace cache and the per-model lock files every time
+    // the submenu opens, so the user always sees the truth (download done →
+    // checkmark appears, download started → "Downloading…" appears) without
+    // any background timers or IPC.
+    if (menu == modelSubmenu) {{
+        [self rebuildModelSubmenu];
+    }}
 }}
 
 - (void)quitWhisperType:(id)sender {{
@@ -715,16 +888,12 @@ int main(int argc, char **argv) {{
         [menu addItem:setHotkeyItem];
 
         NSMenuItem *modelItem = [[NSMenuItem alloc] initWithTitle:@"Model" action:nil keyEquivalent:@""];
-        NSMenu *modelSubmenu = [[NSMenu alloc] initWithTitle:@"Model"];
-        for (int i = 0; i < VALID_MODELS_COUNT; i++) {{
-            NSString *name = [NSString stringWithUTF8String:VALID_MODELS[i]];
-            NSMenuItem *opt = [[NSMenuItem alloc] initWithTitle:name action:@selector(pickModel:) keyEquivalent:@""];
-            [opt setTarget:delegate];
-            if (strcmp(VALID_MODELS[i], current_model) == 0) {{
-                [opt setState:NSControlStateValueOn];
-            }}
-            [modelSubmenu addItem:opt];
-        }}
+        modelSubmenu = [[NSMenu alloc] initWithTitle:@"Model"];
+        // Setting the delegate makes menuNeedsUpdate: fire each time the user
+        // opens the submenu, so we re-stat the HF cache and lock files and
+        // rebuild the items reflecting fresh on-disk state.
+        [modelSubmenu setDelegate:delegate];
+        [delegate rebuildModelSubmenu];
         [modelItem setSubmenu:modelSubmenu];
         [menu addItem:modelItem];
         NSMenuItem *settingsItem = [[NSMenuItem alloc] initWithTitle:@"Open Accessibility Settings" action:@selector(openAccessibilitySettings:) keyEquivalent:@""];

@@ -170,6 +170,46 @@ def test_native_launcher_supports_configurable_whisper_model_via_menu():
     assert "Model will change after restart" in source
 
 
+def test_native_launcher_shows_per_model_downloaded_state_in_submenu():
+    # End-user goal: opening the Model submenu shows which models are already
+    # on disk, which are mid-download (lock file + live PID), and which still
+    # need to be downloaded. The submenu rebuilds on open via NSMenuDelegate
+    # so it always reflects fresh on-disk state — no background polling.
+    source = render_native_launcher_source(
+        repo_dir=Path("/Users/mikka/open-transcribe-studio"),
+        model="base",
+        hold_key="fn",
+        language="en",
+    )
+
+    # C helpers that read disk state.
+    assert "model_is_downloaded" in source
+    assert "models--Systran--faster-whisper-" in source
+    assert "snapshots" in source
+    assert "download_in_progress_for" in source
+    assert "downloading-%s.lock" in source
+    # Stale lock detection so a crashed helper does not block re-download.
+    assert "kill(pid, 0)" in source
+    # Human-readable sizes for the "Download (X GB)" labels.
+    assert "model_size_label" in source
+    assert '"1.5 GB"' in source
+    assert '"3.0 GB"' in source
+
+    # Background fork of the Python helper. setsid() detaches the child
+    # so quitting WhisperType.app doesn't kill an in-flight download.
+    assert "start_model_download" in source
+    assert '"app.mac_dictation.download_model"' in source
+    assert "setsid()" in source
+
+    # Obj-C menu wiring: rebuild on open, three distinct item states.
+    assert "rebuildModelSubmenu" in source
+    assert "NSMenuDelegate" in source
+    assert "menuNeedsUpdate:" in source
+    assert "downloadModel:" in source
+    assert "Downloading…" in source
+    assert "Download (%s)" in source
+
+
 def test_native_launcher_owns_fn_event_tap_so_trust_attaches_to_bundle():
     # macOS TCC binds Input Monitoring trust to the binary that calls
     # CGEventTapCreate. The bundle must own that call so the user's grant

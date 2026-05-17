@@ -26,6 +26,7 @@ What works today:
 - Configurable hotkey. Default is `fn` / Globe, change it any time from the menu bar via *Set hotkey…*. Your choice persists to `~/.config/whispertype/hotkey.txt`.
 - Local microphone recording while the key is held.
 - Local transcription with `faster-whisper`. Defaults to English so it does not hallucinate other languages. Model is configurable from the menu bar (tiny / base / small / medium / large-v3), persists to `~/.config/whispertype/model.txt`.
+- The Model submenu shows which models are already downloaded vs which still need a download. Click *Download* on a missing model to fetch it in the background while you keep dictating with your current one. When it is done, the menu shows it as ready next time you open it.
 - Live status indicator in the menu bar: `WT` idle, `WT ●` recording, `WT…` transcribing, `WT !` error. So you can tell at a glance whether a slow model is still working.
 - Clipboard + Cmd+V paste into the active app.
 - Menu bar shortcuts to the macOS permissions panes (*Open Accessibility Settings*, *Open Input Monitoring Settings*).
@@ -88,9 +89,15 @@ If `WT…` is sitting there for 10+ seconds, the app is not frozen. That is just
 
 ### Change the model from the menu bar
 
-Click `WT` → *Model* → pick one. WhisperType saves your choice to `~/.config/whispertype/model.txt` and shows an alert telling you to quit and reopen the app for the new model to take effect.
+Click `WT` → *Model* and you will see one of three labels for each model:
 
-**First time you pick a new model, Whisper will download it.** This is a one-time cost per model, cached under `~/.cache/huggingface/`. Plan for a few minutes on the bigger ones (`small` ≈ 480 MB, `medium` ≈ 1.5 GB, `large-v3` ≈ 3 GB).
+- **Just the name (e.g. `base`)** — downloaded and ready. A checkmark next to it means it is the active model. Click to switch to it.
+- **`medium — Download (1.5 GB)`** — not on disk yet. Click to start a background download. You can keep dictating with your current model while it runs.
+- **`medium — Downloading…`** — a download is in flight. Open this menu again in a minute or two; when the model is ready, the label flips to plain `medium` with no suffix.
+
+When you click a downloaded model, WhisperType saves your choice to `~/.config/whispertype/model.txt` and shows an alert telling you to quit and reopen the app for the new model to take effect.
+
+Downloaded models are cached under `~/.cache/huggingface/hub/models--Systran--faster-whisper-{name}/`. This is a one-time cost per model.
 
 You can also pick a model at the command line when running from Terminal, or when building the `.app`:
 
