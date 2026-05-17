@@ -32,8 +32,6 @@ What works today:
 - Temp recordings are deleted right after Whisper finishes, so nothing piles up on disk.
 - Tests for the dictation controller, hotkey config, fn listener, and bundle builder.
 
-There is also an older web transcription studio in this repo (file upload + browser playback) that still works, but the main direction now is voice typing anywhere.
-
 ## macOS permissions needed
 
 WhisperType needs three macOS permissions:
@@ -204,22 +202,6 @@ CPU note: idle usage should be very low because it is only listening for key eve
 ```bash
 pytest -q
 ```
-
-## Optional: old web transcription demo
-
-The earlier upload/recording web demo still runs:
-
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Open:
-
-```text
-http://127.0.0.1:8000
-```
-
-But the main direction now is WhisperType.
 
 ## Product roadmap
 
