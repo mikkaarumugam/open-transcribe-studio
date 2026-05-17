@@ -580,7 +580,7 @@ static int restart_python_worker(void);
 
     NSAlert *next = [[NSAlert alloc] init];
     [next setMessageText:@"Permissions reset — now re-grant"];
-    [next setInformativeText:@"System Settings is open at Accessibility (the one most likely to fight you).\\n\\n1. Toggle WhisperType ON in Accessibility.\\n   • If it stays broken (paste does nothing after dictating), click WhisperType in the list, press the minus (–) button to remove it, then drag /Applications/WhisperType.app back into the list.\\n\\n2. Click WT in the menu bar → Open Microphone Settings → toggle WhisperType ON.\\n\\n3. Click WT in the menu bar → Open Input Monitoring Settings → toggle WhisperType ON.\\n\\n4. Click WT → Quit WhisperType, then reopen from /Applications. The new grants only take effect on next launch."];
+    [next setInformativeText:@"System Settings is open at Accessibility.\\n\\n1. ACCESSIBILITY: drag /Applications/WhisperType.app into the list (or use the + button) and toggle it ON. macOS does NOT auto-prompt for this — synthesized paste events fail silently when denied.\\n\\n2. INPUT MONITORING: click WT → Open Input Monitoring Settings. Toggle WhisperType ON, or drag it in if it's not in the list.\\n\\n3. Click WT → Quit WhisperType, then reopen from /Applications.\\n\\n4. MICROPHONE: the Microphone pane does NOT let you add apps manually. Hold fn after reopening — macOS will pop up an Allow/Deny dialog. Click Allow.\\n\\nIf paste still doesn't work after step 1, the Accessibility row is bound to a stale code signature: click WhisperType, press minus (–) to remove it, then drag the .app back in."];
     [next addButtonWithTitle:@"OK"];
     [next runModal];
 }}

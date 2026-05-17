@@ -52,14 +52,14 @@ If macOS does not prompt automatically, open **System Settings → Privacy & Sec
 
 macOS ties permission grants to the binary's code signature, not the bundle ID. Every time you run `whispertype-build-app`, the signature changes and your previous grants stop applying, even though the app name and bundle ID are identical. You will hit this every single rebuild until you set up code signing.
 
-**The one-click fix lives in the menu.** Click `WT` → **Reset Permissions…**. It wipes the TCC records for all three buckets, opens the Accessibility pane (the trickiest one), and walks you through re-granting.
+**The one-click fix lives in the menu.** Click `WT` → **Reset Permissions…**. It wipes the TCC records for all three buckets and opens the Accessibility pane.
 
 Steps after clicking Reset Permissions:
 
-1. In the Accessibility pane that just opened, toggle WhisperType **on**. *If toggling does not work (see "Dictation doesn't paste" below), use the minus button and re-add.*
-2. Click `WT` → **Open Microphone Settings** → toggle WhisperType on.
-3. Click `WT` → **Open Input Monitoring Settings** → toggle WhisperType on.
-4. Click `WT` → **Quit WhisperType**, then reopen from `/Applications`. **New grants only take effect on next launch.**
+1. **Accessibility (manual add):** drag `/Applications/WhisperType.app` into the open Accessibility list, or click the **+** button and pick it. Toggle it on. macOS does **not** auto-prompt for this one because the synthesized Cmd+V used to paste fails silently when denied.
+2. Click `WT` → **Open Input Monitoring Settings** → toggle WhisperType on (or drag it in via the **+** button if it's not in the list).
+3. Click `WT` → **Quit WhisperType**, then reopen from `/Applications`.
+4. **Microphone (auto-prompted only):** the Microphone pane does **not** let you add apps manually. Hold fn for the first time after reopening; macOS will pop up an Allow/Deny dialog. Click Allow. WhisperType then appears in System Settings → Microphone with its toggle on.
 
 If for some reason the menu item is unavailable (e.g. the binary won't launch), the equivalent terminal commands are:
 
@@ -72,10 +72,10 @@ tccutil reset Accessibility com.mikka.open-transcribe-studio.whispertype
 ### Troubleshooting by symptom
 
 **Pressing the hotkey does nothing. The `WT` icon never changes.**
-Input Monitoring is denied. Click `WT` → Open Input Monitoring Settings, toggle WhisperType on, quit + reopen.
+Input Monitoring is denied. Click `WT` → Open Input Monitoring Settings, toggle WhisperType on (or drag it in if it's not in the list), then quit + reopen WhisperType.
 
 **`WT ●` lights up while you hold the hotkey, but no orange mic dot appears in the macOS menu bar, and nothing transcribes.**
-Microphone is denied. Click `WT` → Open Microphone Settings, toggle WhisperType on, quit + reopen.
+Microphone is denied. **The Microphone pane does not let you manually add apps** — you have to trigger the request. Just keep WhisperType running and hold fn one more time; macOS will pop up an Allow/Deny dialog. Click Allow. WhisperType then appears in System Settings → Microphone, where you can later toggle it off if needed.
 
 **Dictation transcribes (you see WT…) but nothing pastes into your text field. Manual Cmd+V works fine.**
 This is the most common one and almost always Accessibility. Try in order:
