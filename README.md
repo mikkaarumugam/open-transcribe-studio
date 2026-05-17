@@ -26,6 +26,7 @@ What works today:
 - Configurable hotkey. Default is `fn` / Globe, change it any time from the menu bar via *Set hotkey…*. Your choice persists to `~/.config/whispertype/hotkey.txt`.
 - Local microphone recording while the key is held.
 - Local transcription with `faster-whisper`. Defaults to English so it does not hallucinate other languages. Model is configurable from the menu bar (tiny / base / small / medium / large-v3), persists to `~/.config/whispertype/model.txt`.
+- Live status indicator in the menu bar: `WT` idle, `WT ●` recording, `WT…` transcribing, `WT !` error. So you can tell at a glance whether a slow model is still working.
 - Clipboard + Cmd+V paste into the active app.
 - Menu bar shortcuts to the macOS permissions panes (*Open Accessibility Settings*, *Open Input Monitoring Settings*).
 - Light cleanup: trims um/uh fillers, fixes spacing, capitalises, adds final punctuation.
@@ -75,6 +76,15 @@ WhisperType uses [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper), 
 | `large-v3` | ~3 GB | ~15+ sec | best | Way overkill for hotkey dictation. You will think it is frozen. It is not, it is just slow. |
 
 For hotkey dictation, the useful range is realistically **`base` or `small`**. Past that, the wait kills the whole point of the hotkey. `medium` and `large-v3` are included for completeness and for cases where you do not mind waiting (e.g. you released fn and are happy to wait for a more accurate transcription of a longer clip).
+
+**The WT menu bar icon changes while it's working**, so you know something is happening even on the slow models:
+
+- `WT`: idle, ready for input.
+- `WT ●`: recording (hotkey held).
+- `WT…`: transcribing (Whisper is running).
+- `WT !`: something errored. Check `~/Library/Logs/WhisperType/launcher.log`.
+
+If `WT…` is sitting there for 10+ seconds, the app is not frozen. That is just `medium` or `large-v3` doing its thing.
 
 ### Change the model from the menu bar
 
@@ -236,7 +246,6 @@ pytest -q
 
 Next things I want to add:
 
-- A visible recording indicator so you know it heard you.
 - Optional silence auto-stop, so you don't have to hold the key.
 - Local text cleanup presets (raw transcript, polished message, email style, coding prompt).
 - A stable signing identity so permission grants survive rebuilds.

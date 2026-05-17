@@ -101,6 +101,13 @@ static char current_model[64] = "{model_c}";
 static const char *VALID_MODELS[] = {{ "tiny", "base", "small", "medium", "large-v3" }};
 static const int VALID_MODELS_COUNT = 5;
 
+// Status indicator: the Python worker writes one of {{idle, recording, transcribing, silence, error}}
+// to ~/.config/whispertype/status.txt whenever the dictation state changes.
+// The launcher polls this file via NSTimer and updates the WT menu bar title
+// so the user sees something is happening instead of dead air during a slow
+// transcription on the larger Whisper models.
+static char current_status[32] = "idle";
+
 // Hotkey detection lives in the launcher (not in the Python worker) so macOS
 // Input Monitoring trust attaches to WhisperType.app — the bundle the user
 // grants in System Settings — instead of
@@ -256,6 +263,36 @@ static void save_model_to_disk(const char *model) {{
     printf("[WhisperType] model config saved: %s\\n", model);
 }}
 
+static void status_file_path(char *out, size_t out_len) {{
+    const char *home = getenv("HOME");
+    if (!home) home = "";
+    snprintf(out, out_len, "%s/.config/whispertype/status.txt", home);
+}}
+
+static bool read_status_from_disk(char *out, size_t out_len) {{
+    char path[4096];
+    status_file_path(path, sizeof(path));
+    FILE *f = fopen(path, "r");
+    if (!f) return false;
+    if (fgets(out, (int)out_len, f) == NULL) {{
+        fclose(f);
+        return false;
+    }}
+    fclose(f);
+    size_t len = strlen(out);
+    while (len > 0 && (out[len - 1] == '\\n' || out[len - 1] == '\\r' || out[len - 1] == ' ')) {{
+        out[--len] = '\\0';
+    }}
+    return len > 0;
+}}
+
+static NSString *menu_title_for_status(const char *status) {{
+    if (strcmp(status, "recording") == 0)    return @"WT \u25CF";   // black circle
+    if (strcmp(status, "transcribing") == 0) return @"WT\u2026";    // ellipsis
+    if (strcmp(status, "error") == 0)        return @"WT !";
+    return @"WT";
+}}
+
 static void write_hotkey_event(const char *event) {{
     if (fn_pipe_write_fd < 0) return;
     char buf[16];
@@ -364,6 +401,7 @@ static void start_fn_event_tap(void) {{
 - (void)pickModel:(id)sender;
 - (void)openAccessibilitySettings:(id)sender;
 - (void)openInputMonitoringSettings:(id)sender;
+- (void)pollStatusIndicator:(NSTimer *)timer;
 @end
 
 @implementation WhisperTypeAppDelegate
@@ -391,6 +429,22 @@ static void start_fn_event_tap(void) {{
     if (modelDisplayItem != nil) {{
         NSString *title = [NSString stringWithFormat:@"Model: %s", current_model];
         [modelDisplayItem setTitle:title];
+    }}
+}}
+
+- (void)pollStatusIndicator:(NSTimer *)timer {{
+    (void)timer;
+    char next[32] = "idle";
+    if (!read_status_from_disk(next, sizeof(next))) {{
+        // File missing or empty: treat as idle so the title resets after a
+        // crash or before the Python worker has written anything.
+        strncpy(next, "idle", sizeof(next) - 1);
+    }}
+    if (strcmp(next, current_status) == 0) return;
+    strncpy(current_status, next, sizeof(current_status) - 1);
+    current_status[sizeof(current_status) - 1] = '\\0';
+    if (statusItem != nil) {{
+        [statusItem.button setTitle:menu_title_for_status(current_status)];
     }}
 }}
 
@@ -690,6 +744,11 @@ int main(int argc, char **argv) {{
             return 1;
         }}
         start_fn_event_tap();
+        [NSTimer scheduledTimerWithTimeInterval:0.25
+                                         target:delegate
+                                       selector:@selector(pollStatusIndicator:)
+                                       userInfo:nil
+                                        repeats:YES];
         [app run];
     }}
     return 0;

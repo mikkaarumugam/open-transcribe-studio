@@ -7,6 +7,7 @@ import threading
 from collections.abc import Callable
 
 from app.mac_dictation.controller import DictationController
+from app.mac_dictation.status_writer import write_status
 from app.mac_dictation.hotkey import HoldKeyListener
 from app.mac_dictation.paste import MacClipboardTyper
 from app.mac_dictation.recorder import WavHoldRecorder
@@ -19,11 +20,13 @@ def create_controller(
     vad_filter: bool = False,
     min_record_seconds: float = 0.35,
 ) -> DictationController:
+    write_status("idle")
     return DictationController(
         recorder=WavHoldRecorder(),
         transcriber=LocalWhisperTranscriber(model_size=model, language=language, vad_filter=vad_filter),
         typer=MacClipboardTyper(),
         min_record_seconds=min_record_seconds,
+        on_status_change=write_status,
     )
 
 

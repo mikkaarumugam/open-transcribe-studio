@@ -122,6 +122,28 @@ def test_native_launcher_supports_configurable_hotkey_with_capture_ui():
     assert "refreshHotkeyMenuLabel" in source
 
 
+def test_native_launcher_polls_status_file_and_updates_menu_bar_title():
+    # End-user goal: the WT menu bar icon shows whether WhisperType is
+    # recording / transcribing / idle so the user has feedback during a
+    # slow Whisper model run instead of dead air.
+    source = render_native_launcher_source(
+        repo_dir=Path("/Users/mikka/open-transcribe-studio"),
+        model="base",
+        hold_key="fn",
+        language="en",
+    )
+
+    assert "read_status_from_disk" in source
+    assert ".config/whispertype/status.txt" in source
+    assert "menu_title_for_status" in source
+    assert "pollStatusIndicator:" in source
+    assert "scheduledTimerWithTimeInterval:0.25" in source
+    # Distinct titles for the three meaningful states.
+    assert '@"WT \u25CF"' in source  # recording (black circle)
+    assert '@"WT\u2026"' in source   # transcribing (ellipsis)
+    assert '@"WT !"' in source       # error
+
+
 def test_native_launcher_supports_configurable_whisper_model_via_menu():
     # End-user goal: pick the Whisper model from the menu bar.
     # Saved to ~/.config/whispertype/model.txt, read on launch, and
