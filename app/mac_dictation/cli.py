@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import platform
+import sys
 import threading
 from collections.abc import Callable
 
@@ -26,12 +27,29 @@ def create_controller(
     )
 
 
-def create_listener_runner(controller: DictationController, hold_key: str) -> Callable[[], None]:
+def create_listener_runner(
+    controller: DictationController,
+    hold_key: str,
+    native_worker: bool = False,
+) -> Callable[[], None]:
     is_macos = platform.system() == "Darwin"
     hold_key_normalized = hold_key.strip().lower()
-    if is_macos and (
-        hold_key_normalized in {"fn", "globe", "63", "<63>", "179", "<179>"}
+    fn_aliases = {"fn", "globe", "63", "<63>", "179", "<179>"}
+
+    if (
+        is_macos
+        and native_worker
+        and hold_key_normalized in fn_aliases
+        and not sys.stdin.isatty()
     ):
+        # Launched by WhisperType.app: the bundle launcher owns the CGEventTap
+        # (so Input Monitoring trust attaches to WhisperType.app) and pipes
+        # FN_DOWN / FN_UP lines to our stdin.
+        from app.mac_dictation.macos_fn import StdinFnListener
+
+        return StdinFnListener(controller=controller).run_forever
+
+    if is_macos and hold_key_normalized in fn_aliases:
         from app.mac_dictation.macos_fn import MacFnEventTapListener
 
         return MacFnEventTapListener(controller=controller, hold_key=hold_key).run_forever
@@ -63,7 +81,11 @@ def main() -> None:
         vad_filter=args.vad_filter,
         min_record_seconds=args.min_record_seconds,
     )
-    run_listener = create_listener_runner(controller=controller, hold_key=args.hold_key)
+    run_listener = create_listener_runner(
+        controller=controller,
+        hold_key=args.hold_key,
+        native_worker=args.native_worker,
+    )
 
     if args.menubar or args.native_worker:
         from app.mac_dictation.macos_permissions import (

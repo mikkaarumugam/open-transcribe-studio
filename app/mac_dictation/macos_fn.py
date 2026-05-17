@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import sys
 import traceback
 import threading
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, TextIO
 
 from app.mac_dictation.controller import DictationController
 
@@ -156,3 +157,36 @@ class MacFnEventTapListener:
         Quartz.CGEventTapEnable(tap, True)
         print("[WhisperType] native macOS fn event tap is running", flush=True)
         Quartz.CFRunLoopRun()
+
+
+class StdinFnListener:
+    """Read fn down/up events from stdin.
+
+    Used when the WhisperType.app bundle launches us as a child process. The
+    bundle's Obj-C launcher owns the CGEventTap (so macOS Input Monitoring trust
+    attaches to the .app, not to /Library/Frameworks/Python.framework/...), and
+    forwards each fn transition to this worker as a line: ``FN_DOWN`` or
+    ``FN_UP``.
+    """
+
+    def __init__(self, controller: DictationController, stream: TextIO | None = None):
+        self.tracker = MacFnStateTracker(
+            controller,
+            on_state_change=lambda state: print(f"[WhisperType] fn {state}", flush=True),
+            fallback_keycodes={FN_KEYCODE, 179},
+        )
+        self.stream = stream if stream is not None else sys.stdin
+
+    def run_forever(self) -> None:
+        print("[WhisperType] reading fn events from launcher pipe (stdin)", flush=True)
+        for raw in self.stream:
+            line = raw.strip()
+            if not line:
+                continue
+            if line == "FN_DOWN":
+                self.tracker.handle_key_down(179)
+            elif line == "FN_UP":
+                self.tracker.handle_key_up(179)
+            else:
+                print(f"[WhisperType] ignored launcher message: {line!r}", flush=True)
+        print("[WhisperType] launcher pipe closed; native worker exiting", flush=True)

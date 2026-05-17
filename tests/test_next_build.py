@@ -87,6 +87,63 @@ def test_native_launcher_execs_repo_python_without_applescript_wrapper():
     assert 'osascript' not in source
 
 
+def test_native_launcher_supports_configurable_hotkey_with_capture_ui():
+    # The end-user goal: hotkey is configurable from the menu bar, persisted to
+    # ~/.config/whispertype/hotkey.txt, and re-read on launch. Match logic
+    # branches between the fn/Globe flag and arbitrary keycode+modifier chords.
+    source = render_native_launcher_source(
+        repo_dir=Path("/Users/mikka/open-transcribe-studio"),
+        model="base",
+        hold_key="fn",
+        language="en",
+    )
+
+    # Config load/save
+    assert "load_hotkey_config_from_disk" in source
+    assert "save_hotkey_config_to_disk" in source
+    assert ".config/whispertype/hotkey.txt" in source
+
+    # Generalized match: keycode + modifier flags, plus fn/Globe special case.
+    assert "current_hotkey.keycode" in source
+    assert "current_hotkey.modifier_flags" in source
+    assert "current_hotkey.use_fn_flag" in source
+    assert "kCGEventFlagMaskCommand" in source
+    assert "kCGEventFlagMaskShift" in source
+
+    # Menu bar UI
+    assert "Set hotkey" in source
+    assert "setHotkey:" in source
+    assert "addLocalMonitorForEventsMatchingMask" in source
+    assert "NSEventMaskKeyDown" in source
+    assert "NSEventMaskFlagsChanged" in source
+
+    # Menu shows the current hotkey label and is refreshed after capture.
+    assert "Hotkey: %s" in source
+    assert "refreshHotkeyMenuLabel" in source
+
+
+def test_native_launcher_owns_fn_event_tap_so_trust_attaches_to_bundle():
+    # macOS TCC binds Input Monitoring trust to the binary that calls
+    # CGEventTapCreate. The bundle must own that call so the user's grant
+    # of "WhisperType" actually authorises the fn key listener (instead of
+    # /Library/Frameworks/Python.framework/.../python3.13, which is what
+    # .venv/bin/python resolves to).
+    source = render_native_launcher_source(
+        repo_dir=Path("/Users/mikka/open-transcribe-studio"),
+        model="base",
+        hold_key="fn",
+        language="en",
+    )
+
+    assert "CGEventTapCreate(" in source
+    assert "kCGEventFlagMaskSecondaryFn" in source
+    assert "pipe(fn_pipe)" in source
+    assert "dup2(fn_pipe[0], STDIN_FILENO)" in source
+    assert 'write_hotkey_event("FN_DOWN")' in source
+    assert 'write_hotkey_event("FN_UP")' in source
+    assert "start_fn_event_tap();" in source
+
+
 def test_native_launcher_source_has_valid_c_string_escapes():
     source = render_native_launcher_source(
         repo_dir=Path("/Users/mikka/open-transcribe-studio"),
@@ -121,4 +178,10 @@ def test_build_app_bundle_writes_macos_app_structure(tmp_path):
     launcher = app_path / "Contents" / "MacOS" / "WhisperType"
     assert launcher.exists()
     assert launcher.stat().st_mode & 0o111
-    assert "--model 'base'" in launcher.read_text()
+    # On Darwin the launcher is a compiled Obj-C binary; the rendered source
+    # is stashed alongside it in Resources. On non-Darwin it is a shell script.
+    source_file = app_path / "Contents" / "Resources" / "WhisperTypeLauncher.m"
+    if source_file.exists():
+        assert '"--model"' in source_file.read_text()
+    else:
+        assert "--model 'base'" in launcher.read_text()

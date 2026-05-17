@@ -1,7 +1,10 @@
+import io
+
 from app.mac_dictation.macos_fn import (
     FN_FLAG_MASK,
     FN_KEYCODE,
     MacFnStateTracker,
+    StdinFnListener,
     parse_fn_fallback_keycodes,
 )
 
@@ -81,3 +84,33 @@ def test_parse_fn_fallback_keycodes_accepts_detect_keys_output_format():
     assert 179 in parse_fn_fallback_keycodes("<179>")
     assert 179 in parse_fn_fallback_keycodes("179")
     assert {63, 179}.issubset(parse_fn_fallback_keycodes("fn"))
+
+
+def test_stdin_fn_listener_translates_pipe_lines_into_controller_events():
+    controller = FakeController()
+    stream = io.StringIO("FN_DOWN\nFN_UP\nFN_DOWN\nFN_UP\n")
+    listener = StdinFnListener(controller=controller, stream=stream)
+
+    listener.run_forever()
+
+    assert controller.events == ["down", "up", "down", "up"]
+
+
+def test_stdin_fn_listener_ignores_blank_and_unknown_lines():
+    controller = FakeController()
+    stream = io.StringIO("\nhello\nFN_DOWN\n\nFN_UP\n")
+    listener = StdinFnListener(controller=controller, stream=stream)
+
+    listener.run_forever()
+
+    assert controller.events == ["down", "up"]
+
+
+def test_stdin_fn_listener_collapses_repeated_down_without_up():
+    controller = FakeController()
+    stream = io.StringIO("FN_DOWN\nFN_DOWN\nFN_UP\n")
+    listener = StdinFnListener(controller=controller, stream=stream)
+
+    listener.run_forever()
+
+    assert controller.events == ["down", "up"]

@@ -33,7 +33,7 @@ def show_input_monitoring_denied_alert() -> None:
             [
                 "osascript",
                 "-e",
-                'display alert "WhisperType fn key blocked" message "WhisperType can show WT, but macOS is blocking the background fn-key listener. Open System Settings → Privacy & Security → Accessibility and Input Monitoring, then allow WhisperType and Python 3. Quit and reopen WhisperType after changing permissions." as critical',
+                'display alert "WhisperType fn key blocked" message "WhisperType can show WT, but macOS is blocking the fn-key listener. Open System Settings → Privacy & Security → Input Monitoring (and Accessibility), turn on WhisperType, then quit and reopen WhisperType." as critical',
             ],
             check=False,
         )
