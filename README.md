@@ -2,9 +2,9 @@
 
 Free, local-first voice typing for macOS. Hold a key, speak, release, and the transcribed text is pasted into whatever app your cursor is already in.
 
-https://github.com/mikkaarumugam/whispertype/raw/main/docs/whispertype-demo.mp4
+<video src="https://github.com/mikkaarumugam/whispertype/raw/main/docs/whispertype-demo.mp4" controls width="100%"></video>
 
-*Click play (with sound). Holding `fn`, speaking, releasing — text appears in the active app. Watch the menu bar icon cycle through `WT` → `WT ●` (recording) → `WT…` (transcribing) → `WT`.*
+*Click play (with sound on). Holding `fn`, speaking, releasing — text appears in the active app. Watch the menu bar icon cycle through `WT` → `WT ●` (recording) → `WT…` (transcribing) → `WT`.*
 
 I was paying for tools like Wispr Flow and Glaido every month. They are great, but I kept wondering if SaaS like this is starting to look optional now that you can vibecode the core feature locally in a weekend. So I built WhisperType to find out.
 
