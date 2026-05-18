@@ -26,21 +26,185 @@ How it works:
 
 No paid API key. No account. No server. Your audio never leaves your machine.
 
-## Current status
+## Why I built this
 
-What works today:
+I kept asking myself: now that I can vibecode a working version of that core feature in a weekend with AI tools, is monthly SaaS for this kind of thing still the right shape? Or has the unit economics quietly flipped, where the paid version has to start justifying itself against a free local one that runs on your own machine?
+
+I built WhisperType to find out. Not to replace any of those products, just to test the thesis with my own hands.
+
+## What this is meant to show
+
+I am going for AI product roles, so I want to be upfront: this is vibecoded. I am not the engineer who hand-wrote it. The thing I am demonstrating is not "I can code". It is the modern product job:
+
+- Take a paid product's core job and identify the one feature people actually pay for.
+- Scope it down to an MVP you can actually ship.
+- Direct an AI to build it, and verify it works on real hardware before calling anything done.
+- Make honest tradeoffs and put the rough edges in the README, not hide them.
+
+A few product calls I made along the way:
+
+- **Picked the core job.** These products do many things; voice-typing-anywhere is the one users pay for. Everything else got cut.
+- **Local over cloud.** No API keys, no accounts, no server. The tradeoff is a one-time model download and slower transcription on small Macs. Worth it for free and private.
+- **Started with `fn` only, then realised the real requirement was "the user picks their own hotkey".** Reframed the scope mid-build and added the menu bar capture UI.
+- **Kept Terminal mode as an escape hatch.** When the bundled `.app` had permissions issues, I shipped both paths instead of waiting for a perfect fix.
+- **Named the rough edges.** TCC grants reset on rebuild because of ad-hoc signing. That's documented in the setup section, not buried.
+
+How I actually work with AI to ship things:
+
+- I describe the user-facing goal. The AI proposes architecture. I verify end-to-end and push back when the diagnosis is wrong. (Example: a "fixed" version still wasn't catching `fn` events. The AI was confident the code was right; I caught that the `.app` bundle had not been rebuilt, so the new Python code was running against a stale Obj-C launcher.)
+- I learn just enough of the platform vocabulary (macOS permissions, code signing, why permissions don't transfer across binaries) to spot when the AI is solving the wrong problem.
+- Tests exist for the parts I needed confidence in. Not because I wrote them, but because I asked for them and read the assertions before merging.
+
+## What this is not
+
+Not a competitor to any paid dictation tool. Not a polished consumer product. Not a claim that AI tools make this effortless. They don't. The work is in the spec, the verification, and the judgement calls.
+
+## What works today
 
 - Global hold-to-dictate on macOS, runs from a real `.app` bundle so you can launch it from Spotlight or Finder like any normal Mac app.
 - Configurable hotkey. Default is `fn` / Globe, change it any time from the menu bar via *Set hotkey…*. Your choice persists to `~/.config/whispertype/hotkey.txt`.
 - Local microphone recording while the key is held.
 - Local transcription with `faster-whisper`. Defaults to English so it does not hallucinate other languages. Model is configurable from the menu bar (tiny / base / small / medium / large-v3), persists to `~/.config/whispertype/model.txt`.
 - The Model submenu shows which models are already downloaded vs which still need a download. Click *Download* on a missing model to fetch it in the background while you keep dictating with your current one. When it is done, the menu shows it as ready next time you open it.
+- Picking a new model **restarts the transcription worker in place** so the new model takes effect right away — no quit-and-reopen dance.
 - Live status indicator in the menu bar: `WT` idle, `WT ●` recording, `WT…` transcribing, `WT !` error. So you can tell at a glance whether a slow model is still working.
 - Clipboard + Cmd+V paste into the active app.
-- Menu bar shortcuts to the macOS permissions panes (*Open Accessibility Settings*, *Open Input Monitoring Settings*).
+- Menu bar shortcuts to all three macOS permission panes, plus a one-click *Reset Permissions…* item that wipes stale TCC grants after rebuilds.
 - Light cleanup: trims um/uh fillers, fixes spacing, capitalises, adds final punctuation.
 - Temp recordings are deleted right after Whisper finishes, so nothing piles up on disk.
 - Tests for the dictation controller, hotkey config, fn listener, and bundle builder.
+
+## What's next
+
+- Optional silence auto-stop, so you don't have to hold the key.
+- Local text cleanup presets (raw transcript, polished message, email style, coding prompt).
+- A stable signing identity so permission grants survive rebuilds.
+- An install script so trying it on a fresh Mac is one command, not eight.
+
+---
+
+# How to install and run
+
+The portfolio narrative is above. Everything below is for anyone who actually wants to run it on their own Mac.
+
+## Install on your Mac
+
+```bash
+git clone https://github.com/mikkaarumugam/whispertype.git
+cd whispertype
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e '.[dev]'
+```
+
+If `sounddevice` complains, install PortAudio:
+
+```bash
+brew install portaudio
+pip install -e '.[dev]'
+```
+
+## Run as a menu bar app (recommended)
+
+Build the local app launcher once, then open it like any Mac app:
+
+```bash
+cd whispertype
+source .venv/bin/activate
+whispertype-build-app --repo-dir "$PWD" --model base --language en
+open dist/WhisperType.app
+```
+
+You'll get a `WT` item in the menu bar. From there you can pick the Whisper model, set a hotkey, open the permission panes, and reset permissions after a rebuild. The native launcher owns the hotkey listener, so macOS permission grants attach to WhisperType.app (not Python).
+
+When you pull updates and rebuild:
+
+```bash
+cd whispertype
+git pull
+source .venv/bin/activate
+pip install -e .
+whispertype-build-app --repo-dir "$PWD" --model base --language en
+cp -R dist/WhisperType.app /Applications/
+open /Applications/WhisperType.app
+```
+
+Then click `WT` → *Reset Permissions…* to re-grant (rebuilds invalidate TCC grants — see permissions section below).
+
+The app writes launch errors to `~/Library/Logs/WhisperType/launcher.log`:
+
+```bash
+tail -80 ~/Library/Logs/WhisperType/launcher.log
+```
+
+When the hotkey is healthy, the log should include lines like:
+
+```text
+[WhisperType] launcher CGEventTap installed (bundle owns hotkey trust)
+[WhisperType] fn down
+[WhisperType] fn up
+```
+
+### Change the hotkey
+
+Click `WT` → *Set hotkey…*, then press the key or combo you want. The choice persists across launches.
+
+### Faster dev loop
+
+For local debugging, use the one-command restart loop instead of repeatedly copying the full rebuild block:
+
+```bash
+whispertype-dev-restart --hold-key '<179>'
+```
+
+It pulls, reinstalls, kills old app/Python workers, rebuilds, opens `WhisperType.app`, and prints the latest launcher log. Use `--no-pull --no-install` when only testing local code changes.
+
+## Run from terminal (alternative)
+
+Useful for debugging or if the `.app` bundle is acting up.
+
+```bash
+cd whispertype
+source .venv/bin/activate
+whispertype --model tiny --language en
+```
+
+If you want Whisper to auto-detect language instead:
+
+```bash
+whispertype --model tiny --language auto
+```
+
+Then:
+
+1. Click into any text box in any app.
+2. Hold `fn`.
+3. Speak.
+4. Release `fn`.
+5. Wait for transcription.
+6. Text should paste into the active app.
+
+### Terminal-mode hotkey fallback
+
+If `fn` isn't detected when running from Terminal, first inspect what macOS exposes:
+
+```bash
+python scripts/detect_keys.py
+```
+
+Press `fn` / Globe and look at the printed `normalised=` value. Then run with that value:
+
+```bash
+whispertype --model tiny --hold-key f18
+```
+
+Or try another key name your keyboard listener can see. On Mikka's Mac, `fn` / Globe shows up as raw `<179>`:
+
+```bash
+whispertype --model tiny --hold-key '<179>'
+```
+
+When running from the `.app` bundle (recommended above), this fallback isn't needed — the native launcher detects `fn` / Globe directly.
 
 ## macOS permissions needed
 
@@ -97,13 +261,6 @@ You rebuilt the `.app` since. Click `WT` → Reset Permissions… and follow the
 
 A proper signing identity would fix all of this once and for all. Ad-hoc dev builds are why you keep hitting it.
 
-## Privacy: what is stored locally
-
-WhisperType is local-first. Nothing is uploaded anywhere. But two things do get written to your Mac while the app runs:
-
-- **A log file** at `~/Library/Logs/WhisperType/launcher.log`. This includes diagnostic lines AND the transcribed text of what you said (so you can debug bad transcriptions). It is plain text. Read it with `tail -80 ~/Library/Logs/WhisperType/launcher.log`. Wipe it any time with `rm ~/Library/Logs/WhisperType/launcher.log`.
-- **A temporary `.wav` recording per hotkey press**, written to the macOS temp folder (`/var/folders/.../T/whispertype-*.wav`) so Whisper can read it. WhisperType deletes each one as soon as transcription finishes. If you ever want to double-check nothing is sitting around, run `ls /var/folders/*/T/whispertype-*.wav 2>/dev/null` (no output = nothing there).
-
 ## Choosing a Whisper model
 
 WhisperType uses [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper), which ships several model sizes. Bigger models are more accurate but slower and bigger on disk. For hotkey-style dictation (short clips, mostly clear English), **`base` is the sweet spot** and it is the default.
@@ -148,187 +305,15 @@ whispertype --model small
 
 The CLI flag controls the *initial default*; the menu choice overrides it on next launch.
 
-## Install on your Mac
+## Privacy: what is stored locally
 
-```bash
-git clone https://github.com/mikkaarumugam/whispertype.git
-cd whispertype
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e '.[dev]'
-```
+WhisperType is local-first. Nothing is uploaded anywhere. But two things do get written to your Mac while the app runs:
 
-If `sounddevice` complains, install PortAudio:
-
-```bash
-brew install portaudio
-pip install -e '.[dev]'
-```
-
-## Run the dictation tool
-
-Fastest model, best for testing:
-
-```bash
-cd whispertype
-source .venv/bin/activate
-whispertype --model tiny
-```
-
-WhisperType now forces English transcription by default:
-
-```bash
-whispertype --model tiny --language en
-```
-
-If you want Whisper to auto-detect language instead:
-
-```bash
-whispertype --model tiny --language auto
-```
-
-Then:
-
-1. Click into any text box in any app.
-2. Hold `fn`.
-3. Speak.
-4. Release `fn`.
-5. Wait for transcription.
-6. Text should paste into the active app.
-
-### Terminal-mode fallback
-
-If you are running from Terminal (not the `.app`) and `fn` is not detected, first inspect what macOS exposes:
-
-```bash
-python scripts/detect_keys.py
-```
-
-Press `fn` / Globe and look at the printed `normalised=` value. Then run with that value:
-
-```bash
-whispertype --model tiny --hold-key f18
-```
-
-Or try another key name that your keyboard listener can see. On Mikka's Mac, `fn` / Globe has shown up as raw `<179>`:
-
-```bash
-whispertype --model tiny --hold-key '<179>'
-```
-
-When you run from the `.app` bundle (recommended), this fallback is not needed. The bundle's native launcher detects `fn` / Globe directly, and any other hotkey can be set from the menu.
-
-## Run as a menu bar app without Terminal
-
-Once the normal `whispertype --model tiny` command works in Terminal, build the local app launcher:
-
-```bash
-cd whispertype
-source .venv/bin/activate
-whispertype-build-app --repo-dir "$PWD" --model tiny --language en
-open dist/WhisperType.app
-```
-
-If double-clicking does not show `WT`, rebuild the app after pulling updates. The builder creates a tiny native macOS launcher that owns the `WT` menu-bar item and starts the Python dictation worker in the background.
-
-```bash
-cd whispertype
-git pull
-source .venv/bin/activate
-pip install -e .
-whispertype-build-app --repo-dir "$PWD" --model tiny --language en
-open dist/WhisperType.app
-```
-
-The app writes launch errors here:
-
-```text
-~/Library/Logs/WhisperType/launcher.log
-```
-
-To inspect it:
-
-```bash
-tail -80 ~/Library/Logs/WhisperType/launcher.log
-```
-
-When the hotkey is healthy, the log should include lines like:
-
-```text
-[WhisperType] launcher CGEventTap installed (bundle owns hotkey trust)
-[WhisperType] fn down
-[WhisperType] fn up
-```
-
-If `WT` appears in the menu bar but pressing the hotkey does nothing and the log does not show `fn down`, the usual cause is that grants reset after a rebuild. See the `tccutil reset` instructions in the macOS permissions section above, then quit and reopen the app.
-
-### Change the hotkey
-
-Click `WT` in the menu bar → *Set hotkey…*, then press the key or combo you want. The choice persists across launches.
-
-For faster local debugging, use the one-command restart loop instead of repeatedly copying the full rebuild block:
-
-```bash
-whispertype-dev-restart --hold-key '<179>'
-```
-
-It pulls, reinstalls, kills old app/Python workers, rebuilds, opens `WhisperType.app`, and prints the latest launcher log. Use `--no-pull --no-install` when only testing local code changes.
-
-What this does:
-
-- launches WhisperType as a normal macOS menu bar app;
-- shows a small `WT` item in the menu bar;
-- keeps listening for hold-`fn` dictation while Terminal is closed;
-- lets you quit from the menu bar.
-
-CPU note: idle usage should be very low because it is only listening for key events. CPU spikes happen after you release `fn`, while Whisper transcribes the recorded audio locally.
+- **A log file** at `~/Library/Logs/WhisperType/launcher.log`. This includes diagnostic lines AND the transcribed text of what you said (so you can debug bad transcriptions). It is plain text. Read it with `tail -80 ~/Library/Logs/WhisperType/launcher.log`. Wipe it any time with `rm ~/Library/Logs/WhisperType/launcher.log`.
+- **A temporary `.wav` recording per hotkey press**, written to the macOS temp folder (`/var/folders/.../T/whispertype-*.wav`) so Whisper can read it. WhisperType deletes each one as soon as transcription finishes. If you ever want to double-check nothing is sitting around, run `ls /var/folders/*/T/whispertype-*.wav 2>/dev/null` (no output = nothing there).
 
 ## Run tests
 
 ```bash
 pytest -q
 ```
-
-## Product roadmap
-
-Next things I want to add:
-
-- Optional silence auto-stop, so you don't have to hold the key.
-- Local text cleanup presets (raw transcript, polished message, email style, coding prompt).
-- A stable signing identity so permission grants survive rebuilds.
-- A short demo video.
-
-## Why I built this
-
-I was paying for Wispr Flow and trying Glaido on the side. Both are good. Both cost money every month. And both have the same core feature: hold a key, talk, get clean text wherever your cursor is.
-
-I kept asking myself: now that I can vibecode a working version of that core feature in a weekend with AI tools, is monthly SaaS for this kind of thing still the right shape? Or has the unit economics quietly flipped, where the paid version has to start justifying itself against a free local one that runs on your own machine?
-
-I built WhisperType to find out. Not to replace any of those products, just to test the thesis with my own hands.
-
-## What this is meant to show
-
-I am going for AI product roles, so I want to be upfront: this is vibecoded. I am not the engineer who hand-wrote it. The thing I am demonstrating is not "I can code". It is the modern product job:
-
-- Take a paid product's core job and identify the one feature people actually pay for.
-- Scope it down to an MVP you can actually ship.
-- Direct an AI to build it, and verify it works on real hardware before calling anything done.
-- Make honest tradeoffs and put the rough edges in the README, not hide them.
-
-A few product calls I made along the way:
-
-- **Picked the core job.** These products do many things; voice-typing-anywhere is the one users pay for. Everything else got cut.
-- **Local over cloud.** No API keys, no accounts, no server. The tradeoff is a one-time model download and slower transcription on small Macs. Worth it for free and private.
-- **Started with `fn` only, then realised the real requirement was "the user picks their own hotkey".** Reframed the scope mid-build and added the menu bar capture UI.
-- **Kept Terminal mode as an escape hatch.** When the bundled `.app` had permissions issues, I shipped both paths instead of waiting for a perfect fix.
-- **Named the rough edges.** TCC grants reset on rebuild because of ad-hoc signing. That's documented above, not buried.
-
-How I actually work with AI to ship things:
-
-- I describe the user-facing goal. The AI proposes architecture. I verify end-to-end and push back when the diagnosis is wrong. (Example: a "fixed" version still wasn't catching `fn` events. The AI was confident the code was right; I caught that the `.app` bundle had not been rebuilt, so the new Python code was running against a stale Obj-C launcher.)
-- I learn just enough of the platform vocabulary (macOS permissions, code signing, why permissions don't transfer across binaries) to spot when the AI is solving the wrong problem.
-- Tests exist for the parts I needed confidence in. Not because I wrote them, but because I asked for them and read the assertions before merging.
-
-## What this is not
-
-Not a competitor to any paid dictation tool. Not a polished consumer product. Not a claim that AI tools make this effortless. They don't. The work is in the spec, the verification, and the judgement calls.
