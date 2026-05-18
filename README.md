@@ -6,7 +6,7 @@ https://github.com/user-attachments/assets/7928793e-1da9-4450-bb69-6ce0afeb145a
 
 *Holding `fn`, speaking, releasing — text appears in the active app. Watch the menu bar icon cycle through `WT` → `WT ●` (recording) → `WT…` (transcribing) → `WT`. Click the speaker icon to hear the live transcription.*
 
-I was paying for tools like Wispr Flow and Glaido every month. They are great, but I kept wondering if SaaS like this is starting to look optional now that you can vibecode the core feature locally in a weekend. So I built WhisperType to find out.
+I free-trialled Wispr Flow and tried Glaido on the side. Both are great. But before deciding to actually pay every month, I kept wondering if SaaS like this is starting to look optional now that you can vibecode the core feature locally in a weekend. So I built WhisperType to find out.
 
 ![WhisperType menu bar with the Model picker open, showing each available Whisper model and which ones are currently downloaded](docs/whispertype-menu.png)
 
@@ -28,7 +28,9 @@ No paid API key. No account. No server. Your audio never leaves your machine.
 
 ## Why I built this
 
-I kept asking myself: now that I can vibecode a working version of that core feature in a weekend with AI tools, is monthly SaaS for this kind of thing still the right shape? Or has the unit economics quietly flipped, where the paid version has to start justifying itself against a free local one that runs on your own machine?
+I was free-trialling Wispr Flow and Glaido. Both are good. Both want a monthly subscription after the trial ends. Both have the same core feature: hold a key, talk, get clean text wherever your cursor is.
+
+Before paying, I kept asking myself: now that I can vibecode a working version of that core feature in a weekend with AI tools, is monthly SaaS for this kind of thing still the right shape? Or has the unit economics quietly flipped, where the paid version has to start justifying itself against a free local one that runs on your own machine?
 
 I built WhisperType to find out. Not to replace any of those products, just to test the thesis with my own hands.
 
@@ -73,13 +75,6 @@ Not a competitor to any paid dictation tool. Not a polished consumer product. No
 - Light cleanup: trims um/uh fillers, fixes spacing, capitalises, adds final punctuation.
 - Temp recordings are deleted right after Whisper finishes, so nothing piles up on disk.
 - Tests for the dictation controller, hotkey config, fn listener, and bundle builder.
-
-## What's next
-
-- Optional silence auto-stop, so you don't have to hold the key.
-- Local text cleanup presets (raw transcript, polished message, email style, coding prompt).
-- A stable signing identity so permission grants survive rebuilds.
-- An install script so trying it on a fresh Mac is one command, not eight.
 
 ---
 
