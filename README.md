@@ -84,12 +84,35 @@ The portfolio narrative is above. Everything below is for anyone who actually wa
 
 ## Install on your Mac
 
+One line:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mikkaarumugam/whispertype/main/scripts/install.sh | bash
+```
+
+This clones the repo to `~/whispertype`, sets up a Python venv, builds the macOS `.app` bundle, copies it to `/Applications`, opens it, and tells you exactly what to do for the three permission grants.
+
+It will **not** auto-install anything system-wide on your Mac (Homebrew, Python, Xcode CLT). If you're missing one of those, the script prints the single command to run and stops cleanly. Re-running the script also works as an updater — it does `git pull` instead of re-cloning.
+
+If you don't trust piped shell scripts (good instinct), download and read it first:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mikkaarumugam/whispertype/main/scripts/install.sh -o install.sh
+cat install.sh
+bash install.sh
+```
+
+### Manual install (if you'd rather)
+
 ```bash
 git clone https://github.com/mikkaarumugam/whispertype.git
 cd whispertype
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
+.venv/bin/whispertype-build-app --repo-dir "$PWD"
+cp -R dist/WhisperType.app /Applications/
+open /Applications/WhisperType.app
 ```
 
 If `sounddevice` complains, install PortAudio:
