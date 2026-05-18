@@ -143,8 +143,8 @@ The CLI flag controls the *initial default*; the menu choice overrides it on nex
 ## Install on your Mac
 
 ```bash
-git clone https://github.com/mikkaarumugam/open-transcribe-studio.git
-cd open-transcribe-studio
+git clone https://github.com/mikkaarumugam/whispertype.git
+cd whispertype
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
@@ -162,7 +162,7 @@ pip install -e '.[dev]'
 Fastest model, best for testing:
 
 ```bash
-cd open-transcribe-studio
+cd whispertype
 source .venv/bin/activate
 whispertype --model tiny
 ```
@@ -215,7 +215,7 @@ When you run from the `.app` bundle (recommended), this fallback is not needed. 
 Once the normal `whispertype --model tiny` command works in Terminal, build the local app launcher:
 
 ```bash
-cd open-transcribe-studio
+cd whispertype
 source .venv/bin/activate
 whispertype-build-app --repo-dir "$PWD" --model tiny --language en
 open dist/WhisperType.app
@@ -224,7 +224,7 @@ open dist/WhisperType.app
 If double-clicking does not show `WT`, rebuild the app after pulling updates. The builder creates a tiny native macOS launcher that owns the `WT` menu-bar item and starts the Python dictation worker in the background.
 
 ```bash
-cd open-transcribe-studio
+cd whispertype
 git pull
 source .venv/bin/activate
 pip install -e .
