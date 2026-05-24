@@ -24,7 +24,7 @@ def main() -> None:
     parser.add_argument(
         "--hold-key",
         default="fn",
-        help="Hold key to build into the app. On Mikka's Mac, '<179>' is the known fn/Globe fallback.",
+        help="Hold key to build into the app. Use '<179>' if fn/Globe isn't detected (common fallback on Apple Silicon).",
     )
     parser.add_argument("--no-pull", action="store_true", help="Skip git pull")
     parser.add_argument("--no-install", action="store_true", help="Skip pip install -e .")
